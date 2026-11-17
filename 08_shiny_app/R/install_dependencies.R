@@ -1,0 +1,16 @@
+args <- commandArgs(FALSE)
+script <- sub('^--file=', '', args[grepl('^--file=', args)][1])
+app_dir <- normalizePath(file.path(dirname(script), '..'), winslash = '/')
+project <- normalizePath(file.path(app_dir, '..', '..'), winslash = '/')
+lib <- file.path(app_dir, '.Rlib')
+dir.create(lib, recursive = TRUE, showWarnings = FALSE)
+.libPaths(c(lib, file.path(project, 'outputs/musicpulse_eda/.Rlib'), .libPaths()))
+options(timeout = 300)
+repo <- Sys.getenv('MUSICPULSE_CRAN', 'https://cloud.r-project.org')
+needed <- c('shiny', 'bslib', 'plotly', 'htmlwidgets', 'htmltools', 'dplyr', 'tidyr', 'readr',
+            'purrr', 'stringr', 'ggplot2', 'scales', 'jsonlite', 'digest', 'chromote')
+missing <- needed[!vapply(needed, requireNamespace, logical(1), quietly = TRUE)]
+if(length(missing)) install.packages(missing, lib = lib, repos = repo, type = 'win.binary')
+stopifnot(all(vapply(needed, requireNamespace, logical(1), quietly = TRUE)))
+cat('Dependencies ready.\n')
+for(p in needed) cat(p, as.character(packageVersion(p)), '\n')

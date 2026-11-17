@@ -5,7 +5,7 @@ This project contains two music datasets and their associated data-processing ma
 ## Project structure
 
 ```text
-R-project/
+data_processing/
 ├── README.md
 ├── 01_data_acquisition/
 ├── 02_douyin_cleaning/
