@@ -1,0 +1,591 @@
+---
+title: "U.S. Music Dataset Cleaning"
+subtitle: "Feature selection, quality assessment, and preparation for EDA"
+format:
+  html:
+    theme: cosmo
+    toc: true
+    toc-location: left
+    toc-depth: 3
+    number-sections: true
+    code-fold: false
+    code-tools: true
+    embed-resources: true
+    smooth-scroll: true
+    fig-align: center
+execute:
+  echo: true
+  warning: false
+  message: false
+  error: false
+---
+
+The U.S. music dataset used in this project was obtained from publicly available data sources. It combines public TikTok, Spotify, daily chart, and coded music records for academic data cleaning and exploratory analysis.
+
+## Feature selection
+
+### Selection rationale
+
+Fields are retained when they describe platform activity, chart position, release age, content composition, record identity, or cross-file linkage. Record-label names, studio and production metadata, artwork, preview links, songwriter fields, and nested platform objects are excluded because they do not contribute to this descriptive story and would add unnecessary cleaning work.
+
+| Dataset | Retained information | Excluded information and rationale |
+|---|---|---|
+| TikTok | Track and ISRC identifiers, release date, chart date, rank, and post count | Album, label, artwork, preview, contributor, and nested history fields; historical summaries can be reconstructed from daily records |
+| Spotify | Track and ISRC identifiers, release date, chart date, rank, play count, and region | Album, label, artwork, contributor, internal platform IDs, and nested history fields; genre is taken from the consistently coded file |
+| Daily time series | Group ID, date, and up to three version-level ranks per platform | Row IDs, internal song IDs, and rank totals that are not play or post counts |
+| Coding file | Track and group keys, platform, title, artist, major-label flag, and six genre indicators | Album label, lyrics, lyric themes, artist ID, followers, duration, and a mostly missing source-duration field |
+
+The coding file does not contain a verified original/cover/remix field. A conservative title-keyword proxy is created during cleaning. Records without a keyword are labelled **Original / unmarked**, which does not mean that originality has been manually confirmed.
+
+### Packages and selected-column import
+
+```{r}
+#| label: setup
+library(readr)
+library(dplyr)
+library(tidyr)
+library(stringr)
+library(forcats)
+library(ggplot2)
+library(scales)
+library(knitr)
+library(patchwork)
+
+options(
+  dplyr.summarise.inform = FALSE,
+  scipen = 999,
+  knitr.kable.NA = "—"
+)
+
+us_root <- normalizePath(file.path(knitr::current_input(dir = TRUE), "../.."), mustWork = TRUE)
+output_dir <- file.path(us_root, "data", "processed")
+dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
+
+paths <- c(
+  tiktok = file.path(us_root, "data", "raw", "tiktok_file.csv"),
+  spotify = file.path(us_root, "data", "raw", "Spotify_file.csv"),
+  daily = file.path(us_root, "data", "raw", "daily-time-series.csv"),
+  coding = file.path(us_root, "data", "raw", "coding_file.csv")
+)
+stopifnot(all(file.exists(paths)))
+
+selected <- list(
+  tiktok = c("id", "isrc", "release_dates", "rank", "posts", "added_at"),
+  spotify = c(
+    "id", "isrc", "release_dates", "rank",
+    "current_plays", "added_at", "code2"
+  ),
+  daily = c(
+    "Date", "group_id",
+    "tiktok_rank_1", "tiktok_rank_2", "tiktok_rank_3",
+    "spotify_rank_1", "spotify_rank_2", "spotify_rank_3"
+  ),
+  coding = c(
+    "id", "name", "group_id", "isrc", "platform", "major_label", "singer",
+    "pop", "rock", "rnb_soul", "hiphop_rap_trap", "dance", "Other"
+  )
+)
+
+read_selected <- function(path, columns, encoding = "UTF-8") {
+  read_csv(
+    path,
+    col_select = all_of(columns),
+    col_types = cols(.default = col_character()),
+    locale = locale(encoding = encoding),
+    na = c("", "NA", "NULL", "null", "n/a"),
+    num_threads = 1,
+    progress = FALSE,
+    show_col_types = FALSE
+  )
+}
+
+tiktok <- read_selected(paths["tiktok"], selected$tiktok)
+spotify <- read_selected(paths["spotify"], selected$spotify)
+daily <- read_selected(paths["daily"], selected$daily)
+coding <- read_selected(paths["coding"], selected$coding, "GB18030")
+
+show_table <- function(data, caption, digits = 2) {
+  kable(data, caption = caption, digits = digits, format.args = list(big.mark = ","))
+}
+```
+
+The coding file is imported as GB18030 because reading its non-ASCII bytes as UTF-8 corrupts some Spanish and Russian titles.
+
+### Selection result
+
+```{r}
+#| label: tbl-feature-selection
+header_width <- function(path, encoding = "UTF-8") {
+  ncol(read_csv(
+    path,
+    n_max = 0,
+    locale = locale(encoding = encoding),
+    show_col_types = FALSE,
+    progress = FALSE
+  ))
+}
+
+feature_selection <- tibble(
+  dataset = c("TikTok", "Spotify", "Daily", "Coding"),
+  original_columns = c(
+    header_width(paths["tiktok"]),
+    header_width(paths["spotify"]),
+    header_width(paths["daily"]),
+    header_width(paths["coding"], "GB18030")
+  ),
+  selected_columns = c(ncol(tiktok), ncol(spotify), ncol(daily), ncol(coding))
+) %>%
+  mutate(
+    removed_columns = original_columns - selected_columns,
+    retained_share = selected_columns / original_columns
+  )
+
+show_table(feature_selection, "Feature selection before and after filtering")
+write_csv(feature_selection, file.path(output_dir, "00_feature_selection.csv"))
+```
+
+The reduced files retain all required join keys and analysis variables while excluding media links, nested objects, record-label information, and ambiguous platform summaries.
+
+## Data overview
+
+### Explicit type conversion
+
+All selected CSV fields are initially read as text. Dates, numeric measures, and binary indicators are converted explicitly so that a single malformed value cannot change the inferred type of an entire column.
+
+```{r}
+#| label: parse-fields
+as_num <- function(x) suppressWarnings(as.numeric(x))
+
+clean_string <- function(x) {
+  x <- str_squish(as.character(x))
+  x[x == ""] <- NA_character_
+  x
+}
+
+release_date <- function(x) as.Date(str_extract(x, "\\d{4}-\\d{2}-\\d{2}"))
+
+tiktok <- tiktok %>%
+  mutate(
+    id = clean_string(id),
+    isrc_norm = toupper(clean_string(isrc)),
+    release_date = release_date(release_dates),
+    date = as.Date(substr(added_at, 1, 10)),
+    rank_num = as_num(rank),
+    posts_num = as_num(posts)
+  )
+
+spotify <- spotify %>%
+  mutate(
+    id = clean_string(id),
+    isrc_norm = toupper(clean_string(isrc)),
+    release_date = release_date(release_dates),
+    date = as.Date(substr(added_at, 1, 10)),
+    rank_num = as_num(rank),
+    plays_num = as_num(current_plays),
+    region = clean_string(code2)
+  )
+
+daily_rank_cols <- c(
+  "tiktok_rank_1", "tiktok_rank_2", "tiktok_rank_3",
+  "spotify_rank_1", "spotify_rank_2", "spotify_rank_3"
+)
+
+daily <- daily %>%
+  mutate(
+    group_id = clean_string(group_id),
+    date = as.Date(Date, format = "%Y/%m/%d"),
+    across(all_of(daily_rank_cols), as_num)
+  )
+
+coding_flag_cols <- c(
+  "major_label", "pop", "rock", "rnb_soul",
+  "hiphop_rap_trap", "dance", "Other"
+)
+
+coding <- coding %>%
+  mutate(
+    across(c(id, name, group_id, isrc, platform, singer), clean_string),
+    platform = str_to_lower(platform),
+    isrc_norm = toupper(isrc),
+    across(all_of(coding_flag_cols), as_num)
+  )
+```
+
+### Dataset dimensions and analysis units
+
+```{r}
+#| label: tbl-overview
+overview_row <- function(data, dataset, id, unit, date = NULL) {
+  has_dates <- !is.null(date)
+  tibble(
+    dataset = dataset,
+    records = nrow(data),
+    analysis_units = n_distinct(id),
+    unit = unit,
+    observed_days = if (has_dates) n_distinct(date) else NA_integer_,
+    first_date = if (has_dates) min(date, na.rm = TRUE) else as.Date(NA),
+    last_date = if (has_dates) max(date, na.rm = TRUE) else as.Date(NA)
+  )
+}
+
+overview <- bind_rows(
+  overview_row(tiktok, "TikTok", tiktok$id, "Track version ID", tiktok$date),
+  overview_row(spotify, "Spotify", spotify$id, "Track version ID", spotify$date),
+  overview_row(daily, "Daily", daily$group_id, "Cross-platform group ID", daily$date),
+  overview_row(coding, "Coding", coding$id, "Coded track version ID")
+)
+
+show_table(overview, "Dataset size, analysis unit, and date range")
+write_csv(overview, file.path(output_dir, "01_data_overview.csv"))
+```
+
+Spotify's region field contains `r unique(na.omit(spotify$region))`. The coding file is a track-version table and therefore has no daily coverage measure.
+
+## Data quality assessment
+
+### Missingness and duplicate keys
+
+```{r}
+#| label: tbl-missing-duplicates
+missing_one <- function(data, dataset) {
+  tibble(
+    dataset = dataset,
+    field = names(data),
+    missing_n = vapply(data, function(x) sum(is.na(x)), numeric(1)),
+    total_n = nrow(data)
+  ) %>%
+    mutate(missing_pct = 100 * missing_n / total_n)
+}
+
+missing_table <- bind_rows(
+  missing_one(
+    select(tiktok, id, isrc_norm, release_date, date, rank_num, posts_num),
+    "TikTok"
+  ),
+  missing_one(
+    select(spotify, id, isrc_norm, release_date, date, rank_num, plays_num, region),
+    "Spotify"
+  ),
+  missing_one(select(daily, group_id, date, all_of(daily_rank_cols)), "Daily"),
+  missing_one(
+    select(coding, id, name, group_id, isrc_norm, platform, singer, all_of(coding_flag_cols)),
+    "Coding"
+  )
+)
+
+duplicate_summary <- tibble(
+  dataset = c("TikTok", "Spotify", "Daily", "Coding"),
+  business_key = c("id + date", "id + date", "group_id + date", "platform + id"),
+  extra_key_duplicates = c(
+    sum(duplicated(tiktok[c("id", "date")])),
+    sum(duplicated(spotify[c("id", "date")])),
+    sum(duplicated(daily[c("group_id", "date")])),
+    sum(duplicated(coding[c("platform", "id")]))
+  ),
+  exact_duplicates = c(
+    sum(duplicated(tiktok)),
+    sum(duplicated(spotify)),
+    sum(duplicated(daily)),
+    sum(duplicated(coding))
+  )
+)
+
+show_table(
+  filter(missing_table, missing_n > 0) %>% arrange(desc(missing_pct)),
+  "Missing values in retained analysis fields"
+)
+
+show_table(duplicate_summary, "Duplicate checks using dataset-specific business keys")
+write_csv(missing_table, file.path(output_dir, "02_missing_by_field.csv"))
+```
+
+The second and third Daily version ranks contain structural missing values because many groups do not have that many versions. A rank of zero means that an existing version was not on the chart that day. Neither condition should trigger row deletion.
+
+### Value validity and date coverage
+
+```{r}
+#| label: tbl-validity-coverage
+daily_invalid_rank <- sum(vapply(
+  daily[daily_rank_cols],
+  function(x) sum(!is.na(x) & (x < 0 | x > 100 | x != floor(x))),
+  numeric(1)
+))
+
+daily_zero_rank <- sum(vapply(
+  daily[daily_rank_cols],
+  function(x) sum(x == 0, na.rm = TRUE),
+  numeric(1)
+))
+
+coding_invalid_flag <- sum(vapply(
+  coding[coding_flag_cols],
+  function(x) sum(is.na(x) | !x %in% c(0, 1)),
+  numeric(1)
+))
+
+coding_invalid_utf8 <- sum(
+  is.na(iconv(coding$name, from = "UTF-8", to = "UTF-8", sub = NA)) &
+    !is.na(coding$name)
+)
+
+value_checks <- tibble(
+  check = c(
+    "TikTok rank outside 1-100",
+    "Spotify rank outside 1-100",
+    "Negative TikTok post count",
+    "Negative Spotify play count",
+    "Daily rank outside 0-100",
+    "Daily zero ranks: valid off-chart state",
+    "Coding binary flag outside 0/1",
+    "Invalid UTF-8 title after GB18030 import"
+  ),
+  affected_values = c(
+    sum(is.na(tiktok$rank_num) | !tiktok$rank_num %in% 1:100),
+    sum(is.na(spotify$rank_num) | !spotify$rank_num %in% 1:100),
+    sum(tiktok$posts_num < 0, na.rm = TRUE),
+    sum(spotify$plays_num < 0, na.rm = TRUE),
+    daily_invalid_rank,
+    daily_zero_rank,
+    coding_invalid_flag,
+    coding_invalid_utf8
+  ),
+  status = c(rep("Invalid", 5), "Valid state", "Invalid", "Invalid")
+)
+
+analysis_start <- as.Date("2020-06-01")
+analysis_end <- as.Date("2022-05-31")
+full_dates <- seq(analysis_start, analysis_end, by = "day")
+
+date_coverage <- tibble(
+  dataset = c("TikTok", "Spotify", "Daily"),
+  observed_dates = c(
+    n_distinct(tiktok$date),
+    n_distinct(spotify$date),
+    n_distinct(daily$date)
+  ),
+  missing_dates = c(
+    length(setdiff(full_dates, unique(tiktok$date))),
+    length(setdiff(full_dates, unique(spotify$date))),
+    length(setdiff(full_dates, unique(daily$date)))
+  )
+)
+
+incomplete_chart_days <- bind_rows(
+  count(tiktok, date) %>% filter(n != 100) %>% mutate(dataset = "TikTok"),
+  count(spotify, date) %>% filter(n != 100) %>% mutate(dataset = "Spotify")
+) %>%
+  select(dataset, date, rows_on_day = n)
+
+show_table(value_checks, "Core numeric, categorical, and text-encoding checks")
+show_table(date_coverage, "Platform-level date coverage")
+show_table(incomplete_chart_days, "Chart dates with a row count other than 100")
+```
+
+A missing platform date remains unknown rather than being converted to an off-chart day. Likewise, the 99-row TikTok date is retained because the identity of the missing 100th track cannot be reconstructed reliably.
+
+### Joinability and coding scope
+
+```{r}
+#| label: tbl-joinability
+coding_tiktok_ids <- coding %>% filter(platform == "tiktok") %>% distinct(id) %>% pull(id)
+coding_spotify_ids <- coding %>% filter(platform == "spotify") %>% distinct(id) %>% pull(id)
+
+joinability <- tibble(
+  check = c(
+    "Coded TikTok IDs linked to the TikTok chart",
+    "Coded Spotify IDs linked to the Spotify chart",
+    "Daily groups linked to the coding file",
+    "TikTok chart tracks covered by coding",
+    "Spotify chart tracks covered by coding"
+  ),
+  share = c(
+    mean(coding_tiktok_ids %in% tiktok$id),
+    mean(coding_spotify_ids %in% spotify$id),
+    mean(unique(daily$group_id) %in% coding$group_id),
+    length(coding_tiktok_ids) / n_distinct(tiktok$id),
+    length(coding_spotify_ids) / n_distinct(spotify$id)
+  )
+)
+
+show_table(joinability, "Join success and coding coverage")
+```
+
+Every coded version links back to its platform chart, and all 68 Daily groups appear in the coding file. However, coding covers only part of each full platform chart. Genre and artist composition must therefore be interpreted as properties of the **coded subsample**, not the complete chart population.
+
+### Findings before cleaning
+
+```{r}
+#| label: tbl-quality-findings
+invalid_total <- sum(value_checks$affected_values[value_checks$status == "Invalid"])
+
+quality_findings <- tibble(
+  issue = c(
+    "Business-key duplicates",
+    "Invalid numeric or binary values",
+    "Entire platform dates missing",
+    "Incomplete daily chart",
+    "Daily zero and structural missing states",
+    "Coding text encoding",
+    "Missing ISRC or release date",
+    "Incomplete coding coverage and proxy recording form"
+  ),
+  observed = c(
+    paste(sum(duplicate_summary$extra_key_duplicates), "extra rows"),
+    paste(invalid_total, "invalid values"),
+    paste0("TikTok: ", date_coverage$missing_dates[1], "; Spotify: ", date_coverage$missing_dates[2]),
+    if (nrow(incomplete_chart_days) == 0) "None" else
+      paste(incomplete_chart_days$dataset[1], incomplete_chart_days$date[1],
+            paste0("(", incomplete_chart_days$rows_on_day[1], " rows)")),
+    paste(format(daily_zero_rank, big.mark = ","), "zeros; structural missingness in version 2/3"),
+    paste(coding_invalid_utf8, "invalid titles after conversion"),
+    paste0(
+      "Coding ISRC: ", sum(is.na(coding$isrc_norm)),
+      "; TikTok release date: ", sum(is.na(tiktok$release_date)),
+      "; Spotify release date: ", sum(is.na(spotify$release_date))
+    ),
+    paste0(
+      "Coding coverage — TikTok: ", percent(joinability$share[4], accuracy = 0.1),
+      "; Spotify: ", percent(joinability$share[5], accuracy = 0.1)
+    )
+  )
+)
+
+show_table(quality_findings, "Quality findings before cleaning")
+write_csv(quality_findings, file.path(output_dir, "03_quality_findings.csv"))
+```
+
+The main result is reassuring: no duplicate business keys, out-of-range ranks, negative popularity measures, or invalid coding flags require row deletion. The remaining concerns are missing dates, structural Daily states, incomplete identifiers and dates, coding coverage, and the proxy nature of recording form.
+
+## Data cleaning
+
+### Cleaning decisions
+
+| Finding | Action | Reason |
+|---|---|---|
+| Duplicate keys | Verify and retain all rows because no business-key duplicates are present | Repeated observations across dates are valid time-series records |
+| Extreme or invalid values | Remove only impossible ranks or negative counts; do not trim valid large values | Very high posts or plays may represent genuine hits |
+| Missing platform dates | Retain gaps and create source-availability indicators | Missing data do not mean that every song was off chart |
+| One 99-row chart date | Retain as observed | The missing track cannot be identified safely |
+| Daily zero and missing ranks | Convert zero to analysis `NA`; preserve structural missingness; calculate the best non-zero rank | Only ranks 1–100 are observed chart positions |
+| Coding text | Import as GB18030 and keep R's UTF-8 strings | Prevents title corruption and keyword-matching failure |
+| Missing ISRC or release date | Do not impute and do not remove the full record | No reliable source supports a guessed value |
+| Coding scope and recording form | Label results as coded-subsample findings; derive a conservative title-keyword proxy | Avoids overstating coverage or manual verification |
+
+### Clean analysis tables
+
+```{r}
+#| label: clean-data
+stopifnot(
+  sum(duplicate_summary$extra_key_duplicates) == 0,
+  invalid_total == 0
+)
+
+tiktok_clean <- tiktok %>%
+  transmute(
+    track_id = id,
+    isrc = isrc_norm,
+    release_date,
+    date,
+    rank = as.integer(rank_num),
+    posts = posts_num
+  ) %>%
+  filter(rank %in% 1:100, posts >= 0) %>%
+  distinct(track_id, date, .keep_all = TRUE) %>%
+  arrange(track_id, date)
+
+spotify_clean <- spotify %>%
+  transmute(
+    track_id = id,
+    isrc = isrc_norm,
+    release_date,
+    date,
+    rank = as.integer(rank_num),
+    plays = plays_num,
+    region
+  ) %>%
+  filter(rank %in% 1:100, plays >= 0) %>%
+  distinct(track_id, date, .keep_all = TRUE) %>%
+  arrange(track_id, date)
+
+rank_or_na <- function(x) {
+  x <- as_num(x)
+  replace(x, x == 0, NA_real_)
+}
+
+daily_clean <- daily %>%
+  transmute(group_id, date, across(all_of(daily_rank_cols), rank_or_na)) %>%
+  mutate(
+    tiktok_best_rank = pmin(tiktok_rank_1, tiktok_rank_2, tiktok_rank_3, na.rm = TRUE),
+    spotify_best_rank = pmin(spotify_rank_1, spotify_rank_2, spotify_rank_3, na.rm = TRUE),
+    tiktok_best_rank = replace(tiktok_best_rank, is.infinite(tiktok_best_rank), NA_real_),
+    spotify_best_rank = replace(spotify_best_rank, is.infinite(spotify_best_rank), NA_real_),
+    tiktok_source_available = date %in% unique(tiktok_clean$date),
+    spotify_source_available = date %in% unique(spotify_clean$date)
+  ) %>%
+  distinct(group_id, date, .keep_all = TRUE) %>%
+  arrange(group_id, date)
+
+coding_clean <- coding %>%
+  transmute(
+    track_id = id,
+    name,
+    group_id,
+    isrc = isrc_norm,
+    platform,
+    major_label = as.integer(major_label),
+    singer,
+    across(c(pop, rock, rnb_soul, hiphop_rap_trap, dance, Other), as.integer)
+  ) %>%
+  mutate(
+    recording_form = case_when(
+      str_detect(str_to_lower(name), "\\b(remix|mix)\\b") ~ "Remix",
+      str_detect(
+        str_to_lower(name),
+        "\\b(cover|karaoke|tribute|version|edit|live|acoustic|nightcore)\\b|sped[ -]?up|slowed"
+      ) ~ "Cover / alternate",
+      TRUE ~ "Original / unmarked"
+    ),
+    artist_segment = case_when(
+      hiphop_rap_trap == 1L ~ "Rap-related",
+      major_label == 1L ~ "Mainstream / major",
+      TRUE ~ "Independent / online-local"
+    )
+  ) %>%
+  distinct(platform, track_id, .keep_all = TRUE)
+```
+
+`artist_segment` is a mutually exclusive plotting category. Rap-related tracks are classified first; the remaining tracks are divided by the major-label indicator. The original non-exclusive genre flags remain available for richer content comparisons.
+
+### Cleaning log and exported data
+
+```{r}
+#| label: tbl-cleaning-log
+cleaning_log <- tibble(
+  dataset = c("TikTok", "Spotify", "Daily", "Coding"),
+  before_rows = c(nrow(tiktok), nrow(spotify), nrow(daily), nrow(coding)),
+  after_rows = c(nrow(tiktok_clean), nrow(spotify_clean), nrow(daily_clean), nrow(coding_clean)),
+  rows_removed = before_rows - after_rows,
+  unresolved_but_documented = c(
+    paste(date_coverage$missing_dates[1], "missing platform dates; release dates remain incomplete"),
+    paste(date_coverage$missing_dates[2], "missing platform dates"),
+    "Zero/missing ranks retain off-chart or absent-version meaning",
+    "ISRC and coverage remain incomplete; recording form is a title proxy"
+  )
+)
+
+stopifnot(
+  !anyDuplicated(tiktok_clean[c("track_id", "date")]),
+  !anyDuplicated(spotify_clean[c("track_id", "date")]),
+  !anyDuplicated(daily_clean[c("group_id", "date")]),
+  !anyDuplicated(coding_clean[c("platform", "track_id")])
+)
+
+show_table(cleaning_log, "Cleaning log")
+
+write_csv(tiktok_clean, file.path(output_dir, "tiktok_clean.csv"))
+write_csv(spotify_clean, file.path(output_dir, "spotify_clean.csv"))
+write_csv(daily_clean, file.path(output_dir, "daily_clean.csv"))
+write_csv(coding_clean, file.path(output_dir, "coding_clean.csv"))
+```
+
+No valid chart record is removed merely to make the datasets look cleaner. Unresolved limitations remain explicit in the log and in the interpretation of each figure.

@@ -1,0 +1,20 @@
+{
+  "engine": "R",
+  "r_version": "R version 4.6.0 (2026-04-24)",
+  "requested_start": "2021-01-11",
+  "requested_end": "2026-11-13",
+  "effective_start": "2021-01-11",
+  "effective_end": "2026-11-13",
+  "expected_dates": 2133,
+  "valid_snapshots": 2132,
+  "raw_observations": 86317,
+  "clean_observations": 86317,
+  "unique_material_ids": 2697,
+  "missing_file_dates": 0,
+  "unusable_dates": 1,
+  "quarantined_rows": 0,
+  "metadata_change_events": 20737,
+  "python_count_checks": 0,
+  "python_id_checks": 0,
+  "all_validation_checks_passed": true
+}

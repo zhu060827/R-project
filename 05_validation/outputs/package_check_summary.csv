@@ -1,0 +1,6 @@
+"file","readable"
+"01_data_acquisition/data/processed/kugou_top100_2year_enriched.csv",TRUE
+"02_douyin_cleaning/data/processed/douyin_master_dataset.csv",TRUE
+"03_kugou_cleaning/data/processed/kugou_analysis_dataset.csv",TRUE
+"04_cross_platform_integration/data/processed/platform_song_coding.csv",TRUE
+"04_cross_platform_integration/data/processed/platform_song_daily_panel.csv",TRUE

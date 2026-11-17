@@ -1,0 +1,20 @@
+# Re-run the entire R import and compare output bytes. No Python involved.
+args_all <- commandArgs(trailingOnly = FALSE)
+script <- sub("^--file=", "", args_all[grepl("^--file=", args_all)][1])
+eda_dir <- normalizePath(file.path(dirname(script), ".."), winslash = "/")
+.libPaths(c(file.path(eda_dir, ".Rlib"), .libPaths()))
+source(file.path(eda_dir, "R", "01_import_clean.R"), encoding = "UTF-8")
+args <- commandArgs(trailingOnly = TRUE)
+get_arg <- function(name, default) { i <- match(name, args); if (is.na(i)) default else args[i + 1L] }
+root <- get_arg("--root", "douyin-hot-hub-main")
+audit <- get_arg("--audit-root", "outputs/douyin_7day_validation")
+artifacts <- c(list.files(file.path(eda_dir, "data"), pattern = "\\.csv$", full.names = TRUE),
+               file.path(eda_dir, "reports", c("PHASE1_REPORT.md", "run_summary.json", "validation_checks.csv")))
+if (!length(artifacts) || !all(file.exists(artifacts))) stop("Run 01_import_clean.R successfully before checking reproduction")
+before <- map_chr(artifacts, ~ digest(file = .x, algo = "sha256"))
+import_clean(root, eda_dir, audit)
+after <- map_chr(artifacts, ~ digest(file = .x, algo = "sha256"))
+checks <- tibble(artifact = substring(artifacts, nchar(eda_dir) + 2L), sha256_before = before, sha256_after = after, identical_bytes = before == after)
+write_data(checks, file.path(eda_dir, "reports", "reproducibility_checks.csv"))
+stopifnot(all(checks$identical_bytes))
+message("R full rerun: ", nrow(checks), " artifact files are byte-identical")
