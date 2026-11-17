@@ -1,96 +1,55 @@
-# MusicPulse Data Processing Evidence
+# MusicPulse China and U.S. Music Datasets
 
-This package contains the data acquisition, cleaning, harmonization, integration, and validation materials used in the report. It is a component of the final project submission, not the complete final report package.
+This project contains two music datasets and their associated data-processing materials: a China dataset and a U.S. dataset.
 
-## Structure
+## Project structure
 
 ```text
-data_processing_evidence/
+R-project/
 ├── README.md
-├── run_all.R
-├── requirements.txt
 ├── 01_data_acquisition/
-│   ├── data/
-│   │   ├── raw/
-│   │   ├── intermediate/
-│   │   ├── processed/
-│   │   └── source/
-│   └── scripts/
-│       ├── R/
-│       └── Python/
 ├── 02_douyin_cleaning/
-│   ├── data/
-│   │   ├── processed/
-│   │   └── upstream/
-│   ├── scripts/R/
-│   └── validation/
 ├── 03_kugou_cleaning/
-│   ├── data/
-│   │   ├── intermediate/
-│   │   └── processed/
-│   └── scripts/R/
 ├── 04_cross_platform_integration/
-│   ├── data/processed/
-│   └── scripts/R/
 ├── 05_validation/
-│   └── outputs/
-└── 06_us_data_cleaning/
-    ├── data/
-    │   ├── raw/
-    │   └── processed/
-    ├── data_manifest.csv
-    └── scripts/R/US_Music_Dataset_Cleaning.qmd
+├── 06_us_data_cleaning/
+├── run_all.R
+└── requirements.txt
 ```
 
-Every numbered folder uses the same principle: scripts are separated from data, and data are grouped as raw, intermediate, processed, source, or validation outputs.
+## China dataset
 
-## R workflow
+The China dataset covers Douyin and KuGou data acquisition, cleaning, harmonization, cross-platform integration, and validation.
 
-Run from this directory:
+- `01_data_acquisition/` contains retained raw JSON/API inputs, source manifests, acquisition scripts, and intermediate tables.
+- `02_douyin_cleaning/` contains Douyin import, cleaning, metadata, observation, and quality-validation outputs.
+- `03_kugou_cleaning/` contains KuGou daily and track-level tables, processing scripts, and quality checks.
+- `04_cross_platform_integration/` contains the harmonized China platform coding table and daily panel.
+- `05_validation/` contains handoff and reproducibility checks.
+
+Run the main R workflow from the project root:
 
 ```bash
 Rscript run_all.R
 ```
 
-`run_all.R` is the only package entry point. It runs the Douyin R cleaning step, reconstructs the KuGou intermediate tables, validates the integrated handoff files, and writes `05_validation/outputs/package_check_summary.csv`.
+## U.S. dataset
 
-Rebuild the KuGou intermediate tables:
+The U.S. dataset is used for the later China--U.S. platform comparison. It contains TikTok, Spotify, daily cross-platform time-series, and coded music records.
 
-```bash
-Rscript 03_kugou_cleaning/scripts/R/reconstruct_intermediates.R
-```
+Within `06_us_data_cleaning/`:
 
-Parse the retained raw files with R:
+- `data/raw/` contains the original imported datasets.
+- `data/processed/` contains the cleaned datasets used for subsequent comparative EDA.
+- `data_manifest.csv` records the role and source name of each file.
+- `scripts/R/US_Music_Dataset_Cleaning.qmd` documents data selection, quality assessment, cleaning decisions, and exported analysis tables.
 
-```bash
-Rscript 01_data_acquisition/scripts/R/parse_kugou_api.R
-Rscript 01_data_acquisition/scripts/R/parse_douyin_json.R
-```
+## Data-processing principles
 
-The KuGou raw API parser was tested on 730 JSON responses and produced 73,000 daily observations. The R package-level check reads the retained source and final schemas and writes `05_validation/outputs/package_check_summary.csv`.
+Raw data are retained separately from processed data. Dates, identifiers, ranks, durations, missing values, duplicate keys, and platform-specific fields are checked before analysis. Original Genre and Mood fields are preserved, while harmonized fields are constructed for comparison. AI-assisted or rule-assisted classifications are treated as derived variables rather than official native labels.
 
-## Main data products
+## Reproducibility and scope
 
-- `01_data_acquisition/data/processed/kugou_top100_2year_enriched.csv`
-- `02_douyin_cleaning/data/processed/douyin_master_dataset.csv`
-- `03_kugou_cleaning/data/processed/kugou_analysis_dataset.csv`
-- `04_cross_platform_integration/data/processed/platform_song_coding.csv`
-- `04_cross_platform_integration/data/processed/platform_song_daily_panel.csv`
+The scripts and data in this repository provide the acquisition and data-processing evidence for the project. Formal EDA reports, the final written report, presentation slides, individual reflections, and the Shiny application are maintained separately in the final course submission package.
 
-The recovered KuGou intermediate tables are in `03_kugou_cleaning/data/intermediate/`. The complete Douyin `hot-music.json` archive is in `01_data_acquisition/data/raw/douyin_json/`, with 2,133 daily files covering 2021-01-11 to 2026-11-13. The full cleaned Douyin observations and metadata handoff tables are in `02_douyin_cleaning/data/upstream/`.
-
-## U.S. comparison-data branch
-
-`06_us_data_cleaning/` contains the U.S. platform data that will be used in the later China--U.S. platform comparison. It is a formal data branch of the project, not merely supplementary evidence. The branch contains raw TikTok, Spotify, daily time-series, and coding files, together with the corresponding cleaned tables. `data_manifest.csv` records the role and original source name of each file.
-
-Within this branch, `data/raw/` contains the original imported datasets and `data/processed/` contains the cleaned analysis datasets. The processed tables should be used for the later comparative EDA, while the raw tables provide acquisition and cleaning evidence. To reproduce the cleaning document, open `06_us_data_cleaning/scripts/R/US_Music_Dataset_Cleaning.qmd` in RStudio or render it from the `06_us_data_cleaning` directory.
-
-## Category handling
-
-Original Genre and Mood fields are retained. Harmonized Genre uses six categories: `Pop`, `Rock`, `R&B / Soul`, `Hip Hop / Rap`, `Dance / Electronic`, and `Other`. Platform-specific classifications are preserved alongside combined fields and conflict flags. KuGou category values may be AI-assisted or rule-assisted derived variables, not official native labels.
-
-## Scope
-
-This package excludes formal EDA reports, the final report, presentation slides, individual reflections, and the Shiny application. Those items belong in the parent final submission package.
-
-Python is optional for the retained processed-data workflow and is only needed for the original KuGou API acquisition utilities. R packages used by the main workflow include `tidyverse`, `jsonlite`, `lubridate`, and `digest`.
+R packages used by the main workflow include `tidyverse`, `jsonlite`, `lubridate`, and `digest`. Python is retained only for selected original KuGou acquisition utilities and supporting metadata operations.
