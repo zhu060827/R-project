@@ -44,6 +44,8 @@ Within `06_us_data_cleaning/`:
 - `data_manifest.csv` records the role and source name of each file.
 - `scripts/R/US_Music_Dataset_Cleaning.qmd` documents data selection, quality assessment, cleaning decisions, and exported analysis tables.
 
+For final submission packaging, copies of the four processed U.S. outputs are also consolidated in the separate `../data_submission/data/processed/us/` package. The original processing outputs remain under `06_us_data_cleaning/data/processed/` so that the data-processing workflow remains reproducible and unchanged.
+
 ## Data-processing principles
 
 Raw data are retained separately from processed data. Dates, identifiers, ranks, durations, missing values, duplicate keys, and platform-specific fields are checked before analysis. Original Genre and Mood fields are preserved, while harmonized fields are constructed for comparison. AI-assisted or rule-assisted classifications are treated as derived variables rather than official native labels.
