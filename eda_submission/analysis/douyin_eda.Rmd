@@ -1,0 +1,425 @@
+---
+title: "Douyin Music Exploratory Data Analysis (EDA)"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo=FALSE, warning=FALSE, message=FALSE,
+                      fig.width=8, fig.height=5)
+library(readr); library(dplyr); library(tidyr); library(ggplot2)
+library(jsonlite); library(knitr)
+library(scales)
+root <- normalizePath("..", winslash="/")
+path <- file.path(root, "data/processed/douyin_master_dataset.csv")
+dat <- read_csv(path, na=c("", "NA", "\\N"), show_col_types=FALSE,
+  col_types=cols(douyin_music_id=col_character(), douyin_song_id=col_character(),
+    observation_date=col_date(), archive_date=col_date(), source_heat=col_double(),
+    source_user_count=col_double(), duration_raw=col_double(), .default=col_guess()))
+parse_tags <- function(x) {
+  if (is.na(x) || !nzchar(trimws(x))) return(character())
+  z <- tryCatch(fromJSON(x, simplifyVector=FALSE), error=function(e) NULL)
+  if (is.null(z)) character() else unique(unlist(z, use.names=FALSE))
+}
+BLUE <- "#3E8C8A"; TEAL <- "#4F8985"; INK <- "#243746"; ACCENT <- "#A46A38"
+reference_theme <- function() {
+  theme_minimal(base_size=13, base_family="Arial") +
+    theme(plot.title=element_text(size=17, face="bold", colour=INK, margin=margin(b=7)),
+          plot.subtitle=element_blank(),
+          plot.caption=element_blank(),
+          plot.title.position="plot", plot.caption.position="plot",
+          panel.grid.minor=element_blank(), panel.grid.major=element_line(colour="#E4EBEF", linewidth=.3),
+          axis.title=element_text(size=11.5, colour=INK), axis.text=element_text(size=10.5, colour="#445560"),
+          plot.margin=margin(16,24,14,18), legend.position="none")
+}
+snapshot_counts <- dat %>% count(archive_date, name="record_count") %>% arrange(archive_date)
+visibility_counts <- dat %>% distinct(snapshot_id, douyin_music_id) %>% count(douyin_music_id, name="observed_snapshot_count")
+latest_materials <- dat %>% arrange(archive_date, response_time, snapshot_id) %>%
+  group_by(douyin_music_id) %>% slice_tail(n=1) %>% ungroup()
+```
+
+# 1. Data and Scope
+
+This analysis uses the existing `data/processed/douyin_master_dataset.csv` as a standalone Douyin archive. KuGou fields are not used in this report. The observation unit is one music-material record within one archived snapshot; the material-level summaries deduplicate records by `douyin_music_id`. Because Douyin snapshots do not contain a fixed number of records each day, snapshot size is treated as archive coverage rather than as a popularity measure.
+
+The analysis retains missing values as missing, does not convert absent labels or usage values to zero, and avoids weighting a material repeatedly simply because it appears in multiple snapshots. The report is descriptive and uses `source_user_count` as a source-provided usage-scale indicator, not as a certified measure of plays or daily new users.
+
+# 2. Data Structure and Quality
+
+```{r structure}
+cat(sprintf(
+  "**Coverage summary:** %s observation records, %s distinct music materials, across %s–%s (%s observed dates).",
+  format(nrow(dat), big.mark=","),
+  format(n_distinct(dat$douyin_music_id), big.mark=","),
+  min(dat$archive_date, na.rm=TRUE),
+  max(dat$archive_date, na.rm=TRUE),
+  n_distinct(dat$archive_date)
+))
+```
+
+```{r quality}
+genre_valid <- sum(!is.na(dat$genre_raw) & trimws(dat$genre_raw) != "")
+mood_valid <- sum(!is.na(dat$mood_raw) & trimws(dat$mood_raw) != "")
+artist_normalized_valid <- sum(!is.na(dat$artist_normalized) & trimws(dat$artist_normalized) != "")
+
+quality <- tibble(
+  Check = c("Duplicate snapshot-material pairs", "Missing music IDs",
+            "Missing titles", "Missing source artist names", "Artist normalization coverage",
+            "Missing user counts", "Missing duration values", "Genre label coverage",
+            "Mood label coverage"),
+  Status = c(
+    if_else(dat |> count(snapshot_id, douyin_music_id) |> filter(n > 1) |> nrow() == 0, "PASS", "CHECK"),
+    if_else(sum(is.na(dat$douyin_music_id) | dat$douyin_music_id == "") == 0, "PASS", "CHECK"),
+    if_else(sum(is.na(dat$title_raw) | dat$title_raw == "") == 0, "PASS", "CHECK"),
+    if_else(sum(is.na(dat$artist_raw) | dat$artist_raw == "") == 0, "PASS", "CHECK"),
+    "INFO",
+    if_else(sum(is.na(dat$source_user_count)) == 0, "PASS", "CHECK"),
+    if_else(sum(is.na(dat$duration_raw)) == 0, "PASS", "CHECK"),
+    "INFO",
+    "INFO"
+  ),
+  Count = c(
+    dat |> count(snapshot_id, douyin_music_id) |> filter(n > 1) |> nrow(),
+    sum(is.na(dat$douyin_music_id) | dat$douyin_music_id == ""),
+    sum(is.na(dat$title_raw) | dat$title_raw == ""),
+    sum(is.na(dat$artist_raw) | dat$artist_raw == ""),
+    paste0(100 * artist_normalized_valid / nrow(dat), "% valid"),
+    sum(is.na(dat$source_user_count)),
+    sum(is.na(dat$duration_raw)),
+    paste0(100 * genre_valid / nrow(dat), "% valid"),
+    paste0(100 * mood_valid / nrow(dat), "% valid")
+  )
+)
+kable(quality, format="html", align=c("l", "c", "r"),
+      table.attr='class="kugou-table compact-table"')
+```
+
+Each row is interpreted as one material-snapshot observation. A missing material record is not recoded as zero usage, and a material appearing in multiple snapshots is not treated as multiple independent materials in material-level summaries. Genre and Mood are multi-label JSON fields, so their category totals are not mutually exclusive. Their coverage is reported rather than treated as a hard failure; category-specific figures use records with available labels and do not delete the underlying materials. The daily snapshot count is retained as a data-coverage diagnostic because Douyin cannot provide a fixed Top100 size; it is not interpreted as the number of popular songs on the platform.
+
+The report follows the Douyin material lifecycle: first, it describes daily archive coverage; second, it examines the overall distribution of source usage; third, it identifies high-usage materials; fourth, it evaluates artist presence and usage performance; finally, it examines Genre, Mood, and song-duration characteristics. Snapshot recurrence and elapsed time span are excluded from the preference analysis because daily archive sizes are not fixed. Cross-platform overlap and timing comparisons are reserved for the later integrated analysis.
+
+# 3. Exploratory Analysis
+
+## 3.1 Daily Chart-Song Collection Coverage
+
+```{r reference-five-figures, fig.width=10.5, fig.height=6.5, dpi=220}
+# Fig. 1 | Daily Snapshot Size
+snapshot_plot <- ggplot(snapshot_counts, aes(archive_date, record_count)) +
+  geom_line(colour=BLUE, linewidth=.7) +
+  geom_point(colour=BLUE, size=.8) +
+  scale_x_date(date_breaks="6 months", date_labels="%Y-%m",
+               expand=expansion(mult=c(.015,.025))) +
+  scale_y_continuous(labels=label_number(big.mark=","),
+                     expand=expansion(mult=c(.02,.10))) +
+  labs(title="Number of Chart Songs Collected per Day on Douyin",
+       x="Snapshot date", y="Number of chart songs collected") +
+  reference_theme()
+snapshot_plot
+```
+
+Figure 1 shows the daily number of music-material records collected from Douyin. The series is mainly used to evaluate collection coverage: a relatively stable level suggests that the archive was collected consistently, whereas sharp peaks or troughs may indicate changes in response size, missing collection, or schema/endpoint changes. The main conclusion is therefore about the reliability and comparability of the archive over time, not about the number of popular songs on Douyin.
+
+## 3.2 Distribution of Music-Material Usage
+
+```{r reference-user-count, fig.width=10.5, fig.height=6.5, dpi=220}
+material_usage_values <- dat %>%
+  filter(!is.na(douyin_music_id), douyin_music_id != "") %>%
+  group_by(douyin_music_id) %>%
+  summarise(source_user_count=median(source_user_count, na.rm=TRUE), .groups="drop") %>%
+  filter(is.finite(source_user_count), source_user_count >= 0) %>%
+  mutate(source_user_count=as.numeric(source_user_count),
+         log1p_user_count=log1p(source_user_count))
+med <- median(material_usage_values$source_user_count)
+p95 <- quantile(material_usage_values$source_user_count, .95, na.rm=TRUE)
+max_user_count <- max(material_usage_values$source_user_count, na.rm=TRUE)
+user_breaks <- c(0, 1, 10^seq(1, ceiling(log10(max_user_count)), by=.25))
+user_breaks <- sort(unique(c(user_breaks, max_user_count)))
+user_axis_breaks <- c(0, 1e4, 1e5, 1e6, 1e7, 5e7)
+ggplot(material_usage_values, aes(source_user_count)) +
+  geom_histogram(aes(fill=after_stat(count)), breaks=user_breaks,
+                 closed="left", colour="white", linewidth=.22) +
+  geom_vline(xintercept=med, colour=ACCENT, linetype="dashed", linewidth=.65) +
+  geom_vline(xintercept=p95, colour=INK, linetype="dotted", linewidth=.65) +
+  annotate("text", x=med, y=Inf, label=paste0("Median: ", comma(round(med))),
+           vjust=1.5, hjust=-.05, colour=ACCENT, size=3.5, fontface="bold") +
+  annotate("text", x=p95, y=Inf, label=paste0("95th pct.: ", comma(round(p95))),
+           vjust=3.2, hjust=-.05, colour=INK, size=3.5, fontface="bold") +
+  scale_fill_gradient(low="#C4E1D0", high="#2F8978", guide="none") +
+  scale_x_continuous(trans="log1p", breaks=user_axis_breaks,
+                     labels=comma(user_axis_breaks),
+                     expand=expansion(mult=c(.005,.01))) +
+  scale_y_continuous(labels=label_number(big.mark=","), expand=expansion(mult=c(0,.12))) +
+  labs(title="Distribution of Music-Material Usage on Douyin",
+       x="Source user count (log-scaled bins; labels show original counts)",
+       y="Number of music materials") +
+  reference_theme()
+```
+
+Figure 2 shows the material-level distribution of `source_user_count` after repeated observations of the same music material have been reduced to its median. The log-scaled bins make the dense low-value region and the long right tail visible; the two reference lines mark the median and 95th percentile. The distribution is right-skewed, meaning that most materials are concentrated at lower usage levels while a relatively small group reaches much higher values. This is a descriptive usage-scale pattern, not a measure of daily new users, plays, or causal popularity.
+
+## 3.3 High-Usage Music Materials
+
+```{r high-usage-materials, fig.width=14, fig.height=6.5, dpi=220}
+material_usage <- dat %>%
+  group_by(douyin_music_id) %>%
+  summarise(
+    title=first(title_raw),
+    artist=first(coalesce(artist_normalized, artist_raw)),
+    genre=first(genre_harmonized), mood=first(mood_grouped),
+    duration=first(duration_raw), original=first(is_original_sound),
+    source_user_count=median(source_user_count, na.rm=TRUE), .groups="drop") %>%
+  filter(is.finite(source_user_count)) %>%
+  slice_max(source_user_count, n=12, with_ties=FALSE) %>%
+  arrange(source_user_count) %>%
+  mutate(
+    title=if_else(is.na(title) | title == "", "Untitled material", title),
+    artist=if_else(is.na(artist) | artist == "", "Unknown artist", artist),
+    material_label=paste0(title, " — ", artist),
+    genre_label=if_else(is.na(genre) | genre == "", "Unavailable", genre),
+    mood_label=if_else(is.na(mood) | mood == "", "Unavailable", mood),
+    duration_label=if_else(is.na(duration), "Unavailable", paste0(round(duration/60, 1), " min")),
+    sound_label=if_else(original %in% TRUE, "Original", "Non-original")) %>%
+  mutate(
+    mood_label=stringr::str_wrap(mood_label, width=22),
+    detail_base=max(source_user_count, na.rm=TRUE),
+    genre_x=detail_base * 1.08,
+    mood_x=detail_base * 1.34,
+    duration_x=detail_base * 1.66,
+    sound_x=detail_base * 1.88)
+ggplot(material_usage, aes(source_user_count, reorder(material_label, source_user_count))) +
+  geom_col(aes(fill=source_user_count), width=.68) +
+  geom_text(aes(x=source_user_count * .97, label=comma(source_user_count)),
+            hjust=1, size=3.1, colour="white", fontface="bold") +
+  geom_text(aes(x=genre_x, label=genre_label),
+            hjust=0, colour=INK, size=2.25, family="Heiti SC") +
+  geom_text(aes(x=mood_x, label=mood_label),
+            hjust=0, colour=INK, size=2.25, family="Heiti SC") +
+  geom_text(aes(x=duration_x, label=duration_label),
+            hjust=0, colour=INK, size=2.25, family="Heiti SC") +
+  geom_text(aes(x=sound_x, label=sound_label),
+            hjust=0, colour=INK, size=2.25, family="Heiti SC") +
+  annotate("text", x=max(material_usage$source_user_count, na.rm=TRUE) * 1.08,
+           y=Inf, label="Genre", hjust=0, vjust=1.5, colour=INK, size=3.0, fontface="bold") +
+  annotate("text", x=max(material_usage$source_user_count, na.rm=TRUE) * 1.34,
+           y=Inf, label="Mood", hjust=0, vjust=1.5, colour=INK, size=3.0, fontface="bold") +
+  annotate("text", x=max(material_usage$source_user_count, na.rm=TRUE) * 1.66,
+           y=Inf, label="Duration", hjust=0, vjust=1.5, colour=INK, size=3.0, fontface="bold") +
+  annotate("text", x=max(material_usage$source_user_count, na.rm=TRUE) * 1.88,
+           y=Inf, label="Sound type", hjust=0, vjust=1.5, colour=INK, size=3.0, fontface="bold") +
+  scale_fill_gradient(low="#A9D3C5", high="#2F8978", guide="none") +
+  scale_x_continuous(breaks=c(0, 25000000, 50000000),
+                     labels=label_number(big.mark=","),
+                     limits=c(0, 100000000), expand=c(0, 0)) +
+  labs(title="Highest-Usage Music Materials on Douyin and Their Features",
+       x="Median source user count", y="Music material — artist") +
+  reference_theme() +
+  theme(panel.grid.major.y=element_blank(),
+        axis.text.y=element_text(family="Heiti SC", size=8.5))
+```
+
+Figure 3 ranks the twelve Douyin music materials with the highest median source-user count and annotates their genre, mood, duration, and sound type. It is designed to identify the high-usage tail and to show whether those materials share recognizable characteristics. The conclusion should be limited to the observed sample: a small number of materials stand out on the usage scale, but the figure does not establish that their genre, mood, or originality causes higher usage.
+
+## 3.4 Artist Presence and Usage Performance
+
+```{r artist-usage, fig.width=10.5, fig.height=6.5, dpi=220}
+artist_usage <- dat %>%
+  filter(!is.na(artist_normalized), nzchar(artist_normalized),
+         !is.na(source_user_count), is.finite(source_user_count), source_user_count >= 0) %>%
+  group_by(artist_normalized, douyin_music_id) %>%
+  summarise(material_usage=median(source_user_count),
+            artist_display=first(coalesce(artist_raw, artist_normalized)),
+            .groups="drop") %>%
+  group_by(artist_normalized) %>%
+  summarise(artist_display=first(artist_display),
+            material_count=n_distinct(douyin_music_id),
+            median_usage=median(material_usage),
+            usage_q25=quantile(material_usage, .25),
+            usage_q75=quantile(material_usage, .75), .groups="drop") %>%
+  filter(material_count >= 2) %>%
+  slice_max(material_count, n=20, with_ties=FALSE) %>%
+  mutate(
+    usage_rank=min_rank(desc(median_usage)),
+    label_artist=if_else(usage_rank <= 6 | material_count >= 14,
+                         artist_display, ""))
+
+ggplot(artist_usage, aes(material_count, median_usage)) +
+  geom_errorbar(aes(ymin=usage_q25, ymax=usage_q75),
+                colour=TEAL, width=.12, linewidth=.6) +
+  geom_point(aes(size=material_count, colour=median_usage), alpha=.9) +
+  geom_text(data=artist_usage %>% filter(nzchar(label_artist)),
+            aes(label=label_artist),
+            colour=INK, size=2.8, family="Heiti SC",
+            nudge_x=.18, nudge_y=80000, hjust=0) +
+  scale_colour_gradient(low="#F6D58A", high="#E27735", name="Median usage") +
+  scale_size_continuous(range=c(3, 10), name="Material count") +
+  scale_y_continuous(labels=label_number(big.mark=","),
+                     expand=expansion(mult=c(.05,.18))) +
+  labs(title="Artist Presence and Usage Performance on Douyin",
+       x="Number of distinct on-chart music materials held by an artist",
+       y="Median number of source users") +
+  reference_theme() + theme(legend.position="right")
+```
+
+Figure 4 compares artist presence and usage performance. The horizontal position and point size indicate the number of distinct music materials associated with an artist, while the vertical position shows the artist-level median usage and the error bar shows the interquartile range across materials. The figure separates breadth from performance: artists contributing many materials are not necessarily the artists whose materials have the highest typical usage.
+
+## 3.5 Genre Composition and Usage Preference
+
+```{r reference-genre, fig.width=10.5, fig.height=6.5, dpi=220}
+genre_plot_data <- dat %>%
+  filter(!is.na(douyin_music_id), douyin_music_id != "") %>%
+  group_by(douyin_music_id) %>%
+  summarise(genre_raw=first(genre_harmonized),
+            material_usage=median(source_user_count, na.rm=TRUE), .groups="drop") %>%
+  transmute(category=strsplit(as.character(genre_raw), "\\s*;\\s*"), material_usage) %>%
+  unnest_longer(category) %>% filter(!is.na(category), nzchar(category)) %>%
+  group_by(category) %>%
+  summarise(count=n(), median_usage=median(material_usage, na.rm=TRUE), .groups="drop") %>%
+  mutate(broad=factor(category, levels=c("Other", "Rock", "Hip Hop / Rap", "R&B / Soul", "Dance / Electronic", "Pop"))) %>%
+  filter(!is.na(broad)) %>%
+  mutate(total_count=count)
+genre_max_count <- max(genre_plot_data$total_count, na.rm=TRUE)
+genre_max_usage <- max(genre_plot_data$median_usage, na.rm=TRUE)
+genre_plot_data <- genre_plot_data %>% mutate(usage_x=median_usage/genre_max_usage*genre_max_count,
+                                               xmin=usage_x-count/2, xmax=usage_x+count/2)
+ggplot(genre_plot_data, aes(y=broad)) +
+  geom_rect(aes(xmin=xmin, xmax=xmax, ymin=as.numeric(broad)-.34, ymax=as.numeric(broad)+.34, fill=broad), colour="white", linewidth=.2) +
+  geom_point(aes(x=usage_x, colour=median_usage), size=2.8, shape=21, fill="#FFF3B0", stroke=.7) +
+  geom_text(data=genre_plot_data %>% distinct(broad, total_count),
+            aes(x=genre_max_count * 1.08, y=as.numeric(broad), label=paste0(comma(total_count), " materials")),
+            hjust=0, colour=INK, size=2.8, inherit.aes=FALSE) +
+  scale_fill_manual(values=c("Other"="#A7D7A0", "Rock"="#3E9F7D", "Hip Hop / Rap"="#DDE7A1", "R&B / Soul"="#68B38E", "Dance / Electronic"="#FFF3B0", "Pop"="#91C993"),
+                    breaks=c("Pop", "Dance / Electronic", "R&B / Soul", "Hip Hop / Rap", "Rock", "Other"),
+                    name="Genre") +
+  scale_colour_gradient(low="#FAD97F", high="#2F8978", name="Median usage") +
+  scale_x_continuous(labels=label_number(big.mark=","), limits=c(-genre_max_count * .12, genre_max_count * 1.2),
+                     sec.axis=sec_axis(~ . / genre_max_count * genre_max_usage,
+                                       name="Median usage per music material (source users)",
+                                       labels=label_number(big.mark=","))) +
+  labs(title="Genre Composition and Usage Scale on Douyin",
+       x="Bar width = number of music materials; bar center = median source-user usage",
+       y="Genre") +
+  reference_theme() + theme(panel.grid.major.y=element_blank(), legend.position="right")
+```
+
+Figure 5 shows the composition of harmonized Genre labels at the music-material level. Bar width represents the number of materials assigned to a genre, while the bar centre represents the median source-user usage for that genre. The figure therefore combines composition and usage scale: some genres account for more materials, while others may have a higher typical usage level. Because a material may carry more than one label, these are label counts rather than mutually exclusive shares.
+
+## 3.6 Mood Composition and Usage Preference
+
+```{r reference-mood, fig.width=10.5, fig.height=6.5, dpi=220}
+mood_order <- c("Playful / Fun", "Romantic / Affectionate", "Sad / Lonely", "Calm / Healing", "Energetic / Positive", "Nostalgic / Reflective")
+mood_plot_data <- dat %>%
+  filter(!is.na(douyin_music_id), douyin_music_id != "") %>%
+  group_by(douyin_music_id) %>%
+  summarise(mood_raw=first(mood_grouped),
+            material_usage=median(source_user_count, na.rm=TRUE), .groups="drop") %>%
+  transmute(category=strsplit(as.character(mood_raw), "\\s*;\\s*"), material_usage) %>%
+  unnest_longer(category) %>%
+  filter(!is.na(category), nzchar(category)) %>%
+  mutate(broad=case_when(
+           stringr::str_detect(category, "Energetic / Positive") ~ "Energetic / Positive",
+           stringr::str_detect(category, "Sad / Lonely") ~ "Sad / Lonely",
+           stringr::str_detect(category, "Calm / Healing") ~ "Calm / Healing",
+           stringr::str_detect(category, "Romantic / Affectionate") ~ "Romantic / Affectionate",
+           stringr::str_detect(category, "Nostalgic / Reflective") ~ "Nostalgic / Reflective",
+           stringr::str_detect(category, "Playful / Fun") ~ "Playful / Fun",
+           TRUE ~ "Other")) %>%
+  filter(broad %in% mood_order) %>%
+  group_by(broad) %>%
+  summarise(total_count=n(),
+            median_usage=if (all(is.na(material_usage))) 0 else median(material_usage, na.rm=TRUE),
+            .groups="drop") %>%
+  tidyr::complete(broad=mood_order, fill=list(total_count=0, median_usage=0)) %>%
+  mutate(broad=as.character(broad),
+         y_pos=match(broad, rev(mood_order)))
+mood_max_count <- max(mood_plot_data$total_count, na.rm=TRUE)
+mood_max_usage <- max(mood_plot_data$median_usage, na.rm=TRUE)
+mood_group_plot <- mood_plot_data %>%
+  mutate(median_usage=ifelse(is.finite(median_usage), median_usage, 0),
+         usage_x=ifelse(mood_max_usage > 0, median_usage / mood_max_usage * mood_max_count, 0),
+         xmin=usage_x - total_count / 2,
+         xmax=usage_x + total_count / 2)
+stopifnot(nrow(mood_group_plot) == length(mood_order),
+          all(mood_group_plot$total_count > 0),
+          all(mood_group_plot$y_pos %in% seq_along(mood_order)))
+print(ggplot(mood_group_plot, aes(x=usage_x, y=y_pos)) +
+  geom_tile(data=mood_group_plot,
+            aes(x=usage_x, y=y_pos, width=total_count, height=.68, fill=broad),
+            inherit.aes=FALSE, colour="white", linewidth=.2) +
+  geom_point(aes(x=usage_x, colour=median_usage),
+             size=2.8, shape=21, fill="#FFF3B0", stroke=.7) +
+  geom_text(aes(x=mood_max_count * 1.08, y=y_pos, label=paste0(comma(total_count), " materials")),
+            hjust=0, colour=INK, size=2.8, inherit.aes=FALSE) +
+  scale_fill_manual(values=c("Playful / Fun"="#3D7CC9",
+                             "Romantic / Affectionate"="#7FB3E3",
+                             "Sad / Lonely"="#BDD7EE",
+                             "Calm / Healing"="#E6F0FF",
+                             "Energetic / Positive"="#F2C94C",
+                             "Nostalgic / Reflective"="#FBE7A7"),
+                    breaks=mood_order,
+                    name="Mood group") +
+  scale_colour_gradient(low="#FBE7A7", high="#3D7CC9", name="Median usage") +
+  scale_x_continuous(labels=label_number(big.mark=","), limits=c(-mood_max_count * .12, mood_max_count * 1.2),
+                     sec.axis=sec_axis(~ . / mood_max_count * mood_max_usage,
+                                       name="Median usage per music material (source users)",
+                                       labels=label_number(big.mark=","))) +
+  scale_y_continuous(breaks=seq_along(mood_order), labels=rev(mood_order), limits=c(.5, 6.5), expand=c(0,0)) +
+  labs(title="Mood Composition and Usage Scale on Douyin",
+       x="Bar width = number of music materials; bar center = median source-user usage",
+       y="Broad mood group") +
+  reference_theme() + theme(plot.title.position="plot",
+                             plot.title=element_text(size=17, face="bold", colour=INK, hjust=0),
+                             panel.grid.major.y=element_blank(), legend.position="right"))
+```
+
+Figure 6 shows the composition of the six broad Mood groups and places each group on the same usage scale. Bar width represents the number of labelled materials and the centre point represents median source-user usage. The figure indicates which moods are more common in the collected material set and whether their typical usage levels differ. These are descriptive label associations; they do not prove that users prefer one mood because the labels are assigned attributes rather than direct preference measurements.
+
+
+## 3.7 Song Duration Profile
+
+```{r duration-profile, fig.width=10.5, fig.height=6.5, dpi=220}
+duration_valid <- dat %>%
+  filter(!is.na(duration_raw), is.finite(duration_raw), duration_raw > 0) %>%
+  mutate(duration_minutes=case_when(
+    tolower(duration_unit) %in% c("ms", "millisecond", "milliseconds") ~ duration_raw / 60000,
+    tolower(duration_unit) %in% c("s", "sec", "second", "seconds") ~ duration_raw / 60,
+    TRUE ~ duration_raw / 60
+  )) %>%
+  filter(duration_minutes > 0, duration_minutes <= 30)
+duration_median <- median(duration_valid$duration_minutes)
+duration_mean <- mean(duration_valid$duration_minutes)
+duration_mode_bin <- hist(duration_valid$duration_minutes, breaks=30, plot=FALSE)
+duration_mode_label <- paste0(round(duration_mode_bin$breaks[which.max(duration_mode_bin$counts)], 1), "–",
+                              round(duration_mode_bin$breaks[which.max(duration_mode_bin$counts) + 1], 1), " min")
+ggplot(duration_valid, aes(duration_minutes)) +
+  geom_histogram(aes(fill=after_stat(count)), bins=30, colour="white", linewidth=.25) +
+  geom_vline(xintercept=duration_median, colour="#3D7CC9", linetype="dashed", linewidth=.8) +
+  geom_vline(xintercept=duration_mean, colour="#F2C94C", linetype="dotted", linewidth=.8) +
+  annotate("text", x=duration_median, y=7600,
+           label=paste0("Median = ", number(duration_median, accuracy=.1), " min"),
+           hjust=-.05, colour="#3D7CC9", size=3.1) +
+  annotate("text", x=duration_mean, y=7200,
+           label=paste0("Mean = ", number(duration_mean, accuracy=.1), " min"),
+           hjust=-.05, colour="#C89B16", size=3.1) +
+  annotate("text", x=0.12, y=6800,
+           label=paste0("n = ", comma(nrow(duration_valid)), " | Most frequent bin = ", duration_mode_label),
+           hjust=0, colour=INK, size=3.0) +
+  scale_fill_gradient(low="#E6F0FF", high="#3D7CC9", name="Number of materials") +
+  scale_x_continuous(labels=number_format(accuracy=.1), expand=expansion(mult=c(.01,.03))) +
+  scale_y_continuous(labels=label_number(big.mark=","), expand=expansion(mult=c(0,.12))) +
+  labs(title="Song Duration Distribution in Douyin Music Materials",
+       x="Music-material duration (minutes)", y="Number of music materials") +
+  reference_theme()
+```
+
+Figure 7 shows the distribution of valid Douyin music-material durations, with the median and mean marked separately and the most frequent interval annotated. The figure summarizes the typical length of the collected materials and reveals whether the distribution is concentrated or has a long tail. Duration is treated as a descriptive content characteristic and is not interpreted as a direct explanation of usage.
+
+# 4. Findings and Limitations
+
+- The Douyin archive should be summarized separately at the observation and material levels because the same material can appear in multiple snapshots.
+- Genre and Mood labels are multi-label attributes, so their totals are not mutually exclusive and should not be added as if they formed a single composition.
+- User-count measures are long-tailed; medians and log-scaled distributions are more informative than means alone.
+- Snapshot record counts describe archive coverage and are not a proxy for material popularity. Snapshot recurrence and elapsed time span are excluded from the substantive preference analysis.
+- Before comparing Douyin with KuGou, align the time window, observation unit, category mapping, and denominator. Douyin user counts and KuGou chart ranks measure different concepts.
+
