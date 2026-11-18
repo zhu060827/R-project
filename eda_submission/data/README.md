@@ -1,5 +1,7 @@
 # EDA Data Access
 
+The four processed datasets used by the EDA reports are stored in the sibling package `submission_packages/data_submission/data/processed/`.
+
 The EDA source files use the following processed tables:
 
 | Report | Required data |
@@ -8,4 +10,4 @@ The EDA source files use the following processed tables:
 | KuGou EDA | `data/processed/kugou_analysis_dataset.csv` |
 | Integrated EDA | `data/processed/platform_song_coding.csv`, `data/processed/platform_song_daily_panel.csv`, and `data/audit/platform_combined_overlap_observations.csv` |
 
-The full processed tables remain in the local project and in the data-processing submission package. They are not duplicated in this GitHub EDA source upload because the Douyin and KuGou tables exceed GitHub's recommended individual-file size limit. The HTML reports rendered from the local full project are retained in the local submission package; the uploaded GitHub folder contains the reproducible R Markdown source, render script, and data-access documentation.
+The EDA package intentionally contains no duplicate data folder. The integrated EDA reconstructs platform observations from the daily panel and therefore uses only these four tables.
