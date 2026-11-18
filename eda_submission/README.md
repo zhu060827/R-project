@@ -10,7 +10,14 @@ The reports document data cleaning decisions, missing-value and duplicate handli
 
 ## Data access
 
-The large processed datasets are retained in the project data-processing package and are not duplicated in this compressed EDA submission archive. The source filenames used by the reports are `douyin_master_dataset.csv`, `kugou_analysis_dataset.csv`, `platform_song_coding.csv`, `platform_song_daily_panel.csv`, and `platform_combined_overlap_observations.csv`. The EDA reports expect them under `data/processed/` and `data/audit/` in a full project checkout. This keeps the GitHub submission below GitHub's individual-file size limits while preserving the complete report source and outputs.
+The four processed datasets are provided in the separate sibling package `../data_submission/data/processed/`:
+
+- `douyin_master_dataset.csv`
+- `kugou_analysis_dataset.csv`
+- `platform_song_coding.csv`
+- `platform_song_daily_panel.csv`
+
+The EDA source files automatically locate this sibling data package when rendered from the submission layout. The integrated EDA reconstructs its platform-level observation table from the daily panel, so a separate audit CSV is not required.
 
 ## Reproduce the reports
 
