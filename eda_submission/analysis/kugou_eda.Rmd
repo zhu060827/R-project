@@ -50,7 +50,8 @@ theme_kugou <- theme_minimal(base_family = "sans", base_size = 10) +
     panel.background = element_rect(fill = "#FFFFFF", color = NA)
   )
 root <- normalizePath("..", mustWork = TRUE)
-canonical <- read_csv(file.path(root, "data/processed/kugou_analysis_dataset.csv"), show_col_types = FALSE)
+data_root <- if (dir.exists(file.path(root, "..", "data_submission"))) normalizePath(file.path(root, "..", "data_submission", "data")) else if (dir.exists(file.path(root, "data_submission"))) file.path(root, "data_submission", "data") else file.path(root, "data")
+canonical <- read_csv(file.path(data_root, "processed/kugou_analysis_dataset.csv"), show_col_types = FALSE)
 daily <- canonical |> mutate(chart_date = as.Date(chart_date))
 track <- canonical |> distinct(kugou_song_id, .keep_all = TRUE) |> mutate(release_date = as.Date(release_date), duration_min = duration_ms / 60000)
 ```
