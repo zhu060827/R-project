@@ -13,7 +13,8 @@ library(readr); library(dplyr); library(tidyr); library(ggplot2)
 library(jsonlite); library(knitr)
 library(scales)
 root <- normalizePath("..", winslash="/")
-path <- file.path(root, "data/processed/douyin_master_dataset.csv")
+data_root <- if (dir.exists(file.path(root, "..", "data_submission"))) normalizePath(file.path(root, "..", "data_submission", "data")) else if (dir.exists(file.path(root, "data_submission"))) file.path(root, "data_submission", "data") else file.path(root, "data")
+path <- file.path(data_root, "processed/douyin_master_dataset.csv")
 dat <- read_csv(path, na=c("", "NA", "\\N"), show_col_types=FALSE,
   col_types=cols(douyin_music_id=col_character(), douyin_song_id=col_character(),
     observation_date=col_date(), archive_date=col_date(), source_heat=col_double(),
