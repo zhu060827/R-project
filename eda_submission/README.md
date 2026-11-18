@@ -10,7 +10,7 @@ The reports document data cleaning decisions, missing-value and duplicate handli
 
 ## Data access
 
-The four processed datasets are provided in the separate sibling package `../data_submission/data/processed/`:
+The four China processed datasets are provided in the separate sibling package `../data_submission/data/processed/`:
 
 - `douyin_master_dataset.csv`
 - `kugou_analysis_dataset.csv`
@@ -18,6 +18,8 @@ The four processed datasets are provided in the separate sibling package `../dat
 - `platform_song_daily_panel.csv`
 
 The EDA source files automatically locate this sibling data package when rendered from the submission layout. The integrated EDA reconstructs its platform-level observation table from the daily panel, so a separate audit CSV is not required.
+
+The EDA package deliberately contains no `data/` folder. The four processed U.S. datasets used by the later comparative work are also kept in `../data_submission/data/processed/us/`: `coding_clean.csv`, `daily_clean.csv`, `spotify_clean.csv`, and `tiktok_clean.csv`.
 
 ## Reproduce the reports
 
