@@ -1,0 +1,201 @@
+---
+title: "U.S. Music Dataset EDA"
+subtitle: "Release Age and China–U.S. Popular Song Genre Comparison"
+lang: en
+format:
+  html:
+    toc: true
+    toc-title: "Contents"
+    code-fold: true
+    code-summary: "Show R code"
+    code-tools: true
+    embed-resources: true
+    theme: cosmo
+    fig-format: png
+    fig-dpi: 180
+execute:
+  echo: true
+  warning: false
+  message: false
+keep-md: true
+---
+
+```{r}
+#| label: setup
+#| include: false
+
+library(tidyverse)
+library(scales)
+
+root <- normalizePath("..")
+data_root <- normalizePath(file.path(root, "..", "data_submission", "data"))
+read_clean <- function(...) {
+  paths <- file.path(data_root, c(...))
+  read_csv(paths[file.exists(paths)][1], show_col_types = FALSE)
+}
+
+tiktok <- read_clean("processed/us/tiktok_clean.csv")
+spotify <- read_clean("processed/us/spotify_clean.csv")
+us_coding <- read_clean("processed/us/coding_clean.csv")
+china_coding <- read_clean("processed/platform_song_coding.csv")
+
+genre_cols <- c("pop", "rock", "rnb_soul", "hiphop_rap_trap", "dance")
+genre_names <- c(
+  pop = "Pop", rock = "Rock", rnb_soul = "R&B / Soul",
+  hiphop_rap_trap = "Hip-hop / Rap / Trap", dance = "Dance"
+)
+genre_colors <- c(
+  setNames(
+    RColorBrewer::brewer.pal(6, "RdBu"),
+    c("Dance", "Hip-hop / Rap / Trap", "Other", "Pop", "R&B / Soul", "Rock")
+  )
+)
+
+theme_set(
+  theme_minimal(base_size = 15) +
+    theme(
+      plot.title = element_text(face = "bold", size = 19, colour = "#25313C"),
+      plot.subtitle = element_text(size = 15, colour = "#5C6770"),
+      plot.caption = element_text(size = 12.5, colour = "#6C757D", hjust = 0),
+      axis.title = element_text(size = 16, face = "bold"),
+      axis.text = element_text(size = 14),
+      panel.grid.minor = element_blank(),
+      legend.position = "top",
+      legend.title = element_text(size = 14, face = "bold"),
+      legend.text = element_text(size = 13),
+      strip.text = element_text(face = "bold", size = 16)
+    )
+)
+```
+
+## Figure 1: Release Age at First Observed Chart Appearance
+
+```{r}
+#| label: fig-release-age
+#| fig-width: 10
+#| fig-height: 8
+#| fig-cap: "Figure 1. Months since release at the first observed chart appearance, stacked by genre."
+
+first_date <- function(x) if (all(is.na(x))) as.Date(NA) else min(x, na.rm = TRUE)
+
+track_meta <- bind_rows(
+  tiktok %>%
+    group_by(track_id) %>%
+    summarise(platform = "TikTok", release_date = first_date(release_date),
+              first_chart_date = min(date), .groups = "drop"),
+  spotify %>%
+    group_by(track_id) %>%
+    summarise(platform = "Spotify", release_date = first_date(release_date),
+              first_chart_date = min(date), .groups = "drop")
+) %>%
+  mutate(age_months = floor(as.numeric(first_chart_date - release_date) / 30.4375))
+
+# Keep the five most common named genre tags; combine all remaining tags as Other.
+top5 <- us_coding %>%
+  pivot_longer(all_of(genre_cols), names_to = "genre", values_to = "flag") %>%
+  filter(flag == 1) %>%
+  count(genre, sort = TRUE) %>%
+  slice_head(n = 5) %>%
+  pull(genre)
+
+age_genre <- us_coding %>%
+  mutate(platform = recode(str_to_lower(platform), tiktok = "TikTok", spotify = "Spotify")) %>%
+  pivot_longer(c(all_of(genre_cols), Other), names_to = "genre", values_to = "flag") %>%
+  filter(flag == 1) %>%
+  mutate(genre = if_else(genre %in% top5, recode(genre, !!!genre_names), "Other")) %>%
+  inner_join(track_meta, by = c("track_id", "platform")) %>%
+  filter(between(age_months, 0, 360)) %>%
+  mutate(platform = factor(platform, levels = c("TikTok", "Spotify")),
+         age_bin = floor(age_months / 12) * 12) %>%
+  count(platform, age_bin, genre)
+
+ggplot(age_genre, aes(age_bin + 6, n, fill = genre)) +
+  geom_col(width = 11, colour = "white", linewidth = 0.2) +
+  facet_wrap(~platform, ncol = 1, scales = "free_y") +
+  scale_x_continuous(breaks = seq(0, 360, 60), expand = expansion(mult = c(0, .01))) +
+  scale_fill_manual(values = genre_colors, name = "Music genre") +
+  labs(
+    title = "Figure 1. Release age at first observed chart appearance",
+    subtitle = "12-month bins; the x-axis is expressed in months and bars are stacked by genre",
+    x = "Months since release", y = "Genre-tag assignments",
+    caption = "View limited to 0-360 months. Genre tags are non-exclusive."
+  )
+```
+
+::: {.callout-note title="How to read Figure 1"}
+
+- The x-axis shows the number of months between a track's release and its first observed chart appearance. Each bar covers 12 months. Bars near the left represent recent releases, while the right-hand tail represents older catalog tracks returning to the charts.
+- Total bar height is the number of **genre-tag assignments** in that interval. Colors show the five most common named genres; all remaining or unclassified tags are grouped as **Other**.
+- Genre tags are non-exclusive, so one track may contribute to more than one segment. Read the two panels by their distributional shapes rather than comparing bar heights directly, because TikTok and Spotify have different usable sample sizes.
+
+:::
+
+## Figure 2: Popular Song Genres in China and the United States
+
+```{r}
+#| label: fig-country-genre
+#| fig-width: 11
+#| fig-height: 6.5
+#| fig-cap: "Figure 2. Broad genre-tag shares among popular songs in China and the United States."
+
+tag_share <- function(data, country) {
+  data %>%
+    mutate(Other = pmax(replace_na(Other, 0),
+                        as.integer(rowSums(across(all_of(genre_cols)), na.rm = TRUE) == 0))) %>%
+    pivot_longer(c(all_of(genre_cols), Other), names_to = "genre", values_to = "flag") %>%
+    group_by(genre) %>%
+    summarise(share = mean(flag == 1, na.rm = TRUE), .groups = "drop") %>%
+    mutate(country = country,
+           genre = if_else(genre == "Other", "Other", recode(genre, !!!genre_names)))
+}
+
+us_tracks <- us_coding %>% distinct(track_id, .keep_all = TRUE)
+china_tracks <- china_coding %>%
+  transmute(
+    track_id = cross_platform_song_id,
+    pop = genre_pop,
+    rock = genre_rock,
+    rnb_soul = genre_rnb_soul,
+    hiphop_rap_trap = genre_hip_hop_rap,
+    dance = genre_dance_electronic,
+    Other = genre_other
+  ) %>%
+  distinct(track_id, .keep_all = TRUE)
+
+country_genre <- bind_rows(
+  tag_share(us_tracks, "United States\nTikTok + Spotify"),
+  tag_share(china_tracks, "China\nKuGou + Douyin")
+)
+
+genre_order <- country_genre %>%
+  group_by(genre) %>%
+  summarise(avg = mean(share), .groups = "drop") %>%
+  arrange(avg) %>%
+  pull(genre)
+
+ggplot(country_genre,
+       aes(share, factor(genre, levels = genre_order), fill = share)) +
+  geom_col(width = .7, show.legend = FALSE) +
+  geom_text(aes(label = percent(share, accuracy = .1)),
+            hjust = -.08, size = 5, colour = "#25313C") +
+  facet_wrap(~country, nrow = 1) +
+  scale_x_continuous(labels = label_percent(),
+                     limits = c(0, max(country_genre$share) * 1.22),
+                     expand = expansion(mult = c(0, 0))) +
+  scale_fill_gradient(low = "#BDE0FE", high = "#5B2A86") +
+  labs(
+    title = "Figure 2. Genre-tag profiles of popular songs in China and the U.S.",
+    subtitle = "Horizontal bars and a light-to-dark gradient both encode the share of tracks",
+    x = "Share of tracks carrying the tag", y = NULL,
+    caption = "Genres are non-exclusive; percentages within a country do not sum to 100%."
+  ) +
+  theme(panel.grid.major.y = element_blank(), panel.spacing.x = unit(1.5, "lines"))
+```
+
+::: {.callout-note title="How to read Figure 2"}
+
+- Each panel represents one country sample. Longer and darker bars indicate a higher share of tracks carrying that genre tag. The percentage at the end of each bar is calculated from deduplicated tracks.
+- The U.S. sample is deduplicated by `track_id` and combines TikTok and Spotify; the China sample is deduplicated by `cross_platform_song_id` and combines KuGou and Douyin. Because genre tags overlap, one track may appear in several bars and the percentages do not sum to 100%.
+- The chart compares the genre structure of these two samples rather than the complete music markets. The platforms and observation periods differ, so the comparison is descriptive and should not be interpreted as a causal or market-size estimate.
+
+:::
