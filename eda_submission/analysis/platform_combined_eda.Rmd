@@ -36,12 +36,22 @@ library(patchwork)
 library(knitr)
 
 root <- normalizePath("..", mustWork = TRUE)
-panel <- read_csv(file.path(root, "data/processed/platform_song_daily_panel.csv"), show_col_types = FALSE) |>
+data_root <- if (dir.exists(file.path(root, "..", "data_submission"))) normalizePath(file.path(root, "..", "data_submission", "data")) else if (dir.exists(file.path(root, "data_submission"))) file.path(root, "data_submission", "data") else file.path(root, "data")
+panel <- read_csv(file.path(data_root, "processed/platform_song_daily_panel.csv"), show_col_types = FALSE) |>
   mutate(observation_date = as.Date(observation_date))
-coding <- read_csv(file.path(root, "data/processed/platform_song_coding.csv"), show_col_types = FALSE)
-combined_raw <- read_csv(file.path(root, "data/audit/platform_combined_overlap_observations.csv"),
-                         show_col_types = FALSE) |>
-  mutate(observation_date = as.Date(observation_date))
+coding <- read_csv(file.path(data_root, "processed/platform_song_coding.csv"), show_col_types = FALSE)
+
+# Reconstruct platform-level observations from the processed daily panel so
+# the integrated EDA depends only on the four processed data tables.
+combined_raw <- bind_rows(
+  panel |> filter(douyin_observed == 1) |>
+    transmute(platform = "douyin", observation_date, platform_track_id = cross_platform_song_id,
+              title = song_title, rank = douyin_rank, cross_platform_song_id),
+  panel |> filter(kugou_observed == 1) |>
+    transmute(platform = "kugou", observation_date, platform_track_id = cross_platform_song_id,
+              title = song_title, rank = kugou_rank, cross_platform_song_id)
+) |>
+  mutate(platform_record_id = paste(platform, cross_platform_song_id, observation_date, sep = "_"))
 
 # Use the coding table as the authoritative source for harmonised categories.
 # The observation table remains the source for platform/date-level records.
@@ -566,7 +576,7 @@ The next step can use the shared candidate ID for exploratory interaction analys
 
 # 9. Reproducibility
 
-This report reads `data/processed/platform_song_daily_panel.csv`, `data/processed/platform_song_coding.csv`, and `data/audit/platform_combined_overlap_observations.csv`. Render it from the project root with:
+This report reads the four processed tables in the separate `data_submission/data/processed/` package. The integrated observation layer is reconstructed from the daily panel, so no separate audit CSV is required. Render it from the EDA package with:
 
 ```r
 rmarkdown::render("analysis/platform_combined_eda.Rmd")
