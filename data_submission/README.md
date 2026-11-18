@@ -20,6 +20,6 @@ The processed U.S. data from the earlier cleaning step are stored under `data/pr
 - `spotify_clean.csv`
 - `tiktok_clean.csv`
 
-These tables are the cleaned inputs for the later China–U.S. comparative analysis.
+These tables are the cleaned inputs for the U.S. EDA and later China–U.S. comparative analysis. The U.S. Quarto source is `../eda_submission/analysis/US_Music_Dataset_EDA.qmd`.
 
 The two large platform-level CSVs are intentionally kept outside the GitHub source-only EDA upload because they exceed GitHub's ordinary individual-file size limit. They should be included in the final compressed submission folder or stored with Git LFS when the full repository is uploaded.
