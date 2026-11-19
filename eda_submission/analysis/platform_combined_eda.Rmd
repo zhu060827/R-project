@@ -294,7 +294,8 @@ The overlap histogram summarizes, for each shared candidate, the share of observ
 overlap_median <- median(shared_stats$temporal_jaccard, na.rm = TRUE)
 
 ggplot(shared_stats, aes(temporal_jaccard)) +
-  geom_histogram(aes(fill = after_stat(x)),
+  # Colour intensity represents the number of songs in each bin.
+  geom_histogram(aes(fill = after_stat(count)),
                  binwidth = .05, boundary = 0,
                  colour = "white", linewidth = .25) +
   geom_vline(xintercept = overlap_median,
@@ -304,11 +305,9 @@ ggplot(shared_stats, aes(temporal_jaccard)) +
            label = paste0("Median = ", scales::number(overlap_median, accuracy = .01)),
            vjust = 2.8, hjust = -0.1,
            colour = "#8A551A", fontface = "bold", size = 4) +
-  scale_fill_gradientn(
-    colours = c("#D7E8F7", "#9FC6E5", "#5E8FC4", "#123B70"),
-    values = c(0, .25, .5, 1),
-    limits = c(0, 1),
-    name = "Same-day overlap share") +
+  scale_fill_gradient(
+    low = "#D7E8F7", high = "#123B70",
+    name = "Songs per bin") +
   scale_x_continuous(
     limits = c(0, 1),
     breaks = seq(0, 1, by = .2),
@@ -581,4 +580,5 @@ This report reads the four processed tables in the separate `data_submission/dat
 ```r
 rmarkdown::render("analysis/platform_combined_eda.Rmd")
 ```
+
 
