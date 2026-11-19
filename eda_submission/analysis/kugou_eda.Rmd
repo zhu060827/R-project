@@ -343,7 +343,10 @@ The genre-composition chart shows how the KuGou Daily Top100 is distributed acro
 genre_long <- track |> select(kugou_song_id, peak_rank, genre_harmonized) |> rename(genre = genre_harmonized)
 genre_long <- genre_long |> add_count(genre, name = "genre_n") |> filter(genre_n >= 5)
 genre_medians <- genre_long |> group_by(genre) |> summarise(median_rank = median(peak_rank, na.rm = TRUE), .groups = "drop")
-genre_display_order <- c("Pop", "Dance / Electronic", "Rock", "R&B / Soul", "Hip Hop / Rap", "Other")
+# Keep the original classification order when read from top to bottom.
+# coord_flip() displays discrete levels in reverse vertical order, so the
+# factor levels are stored in reverse here.
+genre_display_order <- c("Other", "Dance / Electronic", "Hip Hop / Rap", "R&B / Soul", "Rock", "Pop")
 genre_long <- genre_long |> left_join(genre_medians, by = "genre") |>
   mutate(genre = factor(genre, levels = genre_display_order))
 rank_genre_plot <- ggplot(genre_long, aes(genre, peak_rank, fill = median_rank)) +
@@ -499,3 +502,4 @@ cat(sprintf("- The median peak rank is %.0f; median observed chart persistence i
 cat("- Because a complete Daily Top100 is available each day, the daily mean rank has limited variation; new entries, Top10 frequency, peak rank, and persistence are more informative.\n")
 cat("- Genre and mood assignments are rule-assisted screening variables with classification risk; this report describes distributions and associations, not causal effects.\n")
 ```
+
