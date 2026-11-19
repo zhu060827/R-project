@@ -1,0 +1,42 @@
+/* Scoped additions only: the existing grids, chart regions and theme stay intact. */
+.mp-preview-entry { margin-left:auto; display:inline-flex; align-items:center; gap:6px; flex-shrink:0; }
+.mp-preview-button,.mp-preview-status { font:inherit; font-size:10px; padding:3px 9px; border:1px solid #F5D4EB55; border-radius:14px; color:#FFF2FC; background:#D49BCB28; line-height:1.4; white-space:nowrap; }
+.mp-preview-button:hover { background:#D49BCB4D; color:white; }
+.mp-preview-status:disabled { opacity:.75; cursor:default; }
+.mp-preview-info { display:inline-grid; place-items:center; width:20px; height:20px; padding:0; border:1px solid #EED7F05C; border-radius:50%; background:transparent; color:#F3DDED; font:11px/1 system-ui,sans-serif; }
+.mp-preview-info:hover { color:white; background:#FFFFFF20; }
+.mp-preview-modal .modal-dialog { width:calc(100% - 28px); max-width:460px; min-height:calc(100% - 48px); display:flex; align-items:center; margin:24px auto; }
+.mp-preview-modal .modal-content { color:#FFF5FC; background:radial-gradient(ellipse at 95% 0%,#A5689552,transparent 65%),#301B40; border:1px solid #CFAAD74D; border-radius:22px; box-shadow:0 24px 80px #1C0E3359; overflow:hidden; }
+.mp-preview-modal .modal-header { position:relative; padding:20px 23px 0; border:0; align-items:center; }
+.mp-preview-modal .modal-title { color:#F1DCEE; font:600 13px/1.4 system-ui,sans-serif; letter-spacing:.2px; }
+.mp-preview-modal .btn-close { filter:invert(1); opacity:.8; }
+.mp-preview-x { position:absolute; right:18px; top:16px; width:28px; height:28px; border:0; border-radius:50%; color:#F4DBEF; background:transparent; font:22px/1 system-ui,sans-serif; }
+.mp-preview-x:hover { color:white; background:#FFFFFF12; }
+.mp-preview-x:focus-visible { outline:2px solid #F1D4B2; outline-offset:2px; }
+.mp-preview-modal .modal-body { padding:15px 25px 8px; }
+.mp-preview-body { text-align:center; }
+.mp-preview-record { position:relative; width:154px; aspect-ratio:1; margin:7px auto 17px; border-radius:50%; background:repeating-radial-gradient(circle,#20152C 0 2px,#392540 3px,#22172F 4px 6px); box-shadow:0 8px 25px #11091F60; border:1px solid #9E7EAD6B; }
+.mp-preview-record::after { content:''; position:absolute; inset:calc(50% - 5px); background:#301B40; border-radius:50%; box-shadow:0 0 0 1px #E7CCE399; }
+.mp-preview-record>span { position:absolute; inset:30%; border-radius:50%; background:linear-gradient(135deg,#D899C8,#AD7FA9 60%,#E8BE92); }
+.mp-preview-body h3 { color:#FFF5FC; font:650 19px/1.4 system-ui,sans-serif; overflow-wrap:anywhere; margin:0 0 6px; }
+.mp-preview-artist { color:#ECD2E4; font-size:13px; line-height:1.45; margin:0 0 5px; }
+.mp-preview-kind,.mp-preview-provenance { color:#C6B2D0; font-size:10px; }
+.mp-preview-kind { margin:0 0 16px; }
+.mp-preview-provenance { display:block; margin:16px 0 4px; }
+.mp-preview-empty { padding:15px 14px; border-radius:12px; background:#FFFFFF08; border:1px solid #E9CBF01C; }
+.mp-preview-empty strong { color:#EBCADF; font-size:13px; }
+.mp-preview-empty p { font-size:12px; line-height:1.5; margin:6px 0 0; color:#D4C0DE; }
+.mp-preview-body audio { width:100%; height:44px; }
+.mp-preview-body iframe { width:100%; height:180px; border:0; border-radius:10px; }
+.mp-preview-modal .modal-footer { justify-content:center; border:0; padding:8px 25px 20px; }
+.mp-preview-modal .modal-footer .btn { color:#39213F; background:#F1D4B2; border:0; border-radius:20px; padding:6px 25px; font-size:12px; }
+.mp-kugou-link { display:inline-flex; align-items:center; gap:5px; color:var(--mp-selected); text-decoration:none; font-size:11px; line-height:1.35; }
+.mp-kugou-link svg { display:block; width:13px; height:13px; flex-shrink:0; }
+.mp-kugou-link:hover { color:#A15B8F; }
+.mp-kugou-compact { width:20px; height:20px; justify-content:center; flex-shrink:0; }
+.dyn-song-with-link { display:flex; align-items:center; min-width:0; }
+.dyn-song-with-link>.dyn-row-select { min-width:0; flex:1; }
+.dyn-selected-title .mp-kugou-link { margin-left:7px; vertical-align:middle; }
+.mp-preview-empty .mp-kugou-link { margin-top:12px; color:#F2CEAA; }
+.mp-preview-button:focus-visible,.mp-preview-info:focus-visible,.mp-kugou-link:focus-visible { outline:2px solid var(--mp-pink); outline-offset:3px; }
+@media(max-width:600px) { .mp-preview-modal .modal-dialog { min-height:calc(100% - 36px); margin:18px auto; } .mp-preview-modal .modal-body { padding:12px 20px 8px; } .mp-preview-record { width:130px; } .selected-meta:has(.mp-preview-entry) { flex-wrap:wrap; } }

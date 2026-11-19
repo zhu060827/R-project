@@ -1,0 +1,76 @@
+/* User-selected grape / blush / champagne restyle. Existing grid sizes and
+   plot hit targets are deliberately preserved; image layers are backgrounds. */
+body { background:radial-gradient(ellipse 550px 240px at 3% 0%,#EBDDF1A8,transparent 78%),var(--mp-cream); color:var(--ink); }
+.dashboard-card { border-color:var(--border); box-shadow:0 3px 12px #44215805; }
+.brand { color:var(--ink); }
+.brand-line { display:flex; align-items:center; gap:10px; }
+.brand-line>span { font-size:25px; font-weight:750; letter-spacing:-.7px; line-height:1.15; }
+.mp-icon { width:26px; height:26px; display:block; flex-shrink:0; }
+.brand-line .mp-icon { width:35px; height:35px; color:var(--mp-purple); }
+.brand>small { margin-left:45px; font-size:10px; letter-spacing:.45px; }
+.nav-item { border-radius:24px; padding:8px 15px; }
+.nav-item.active { background:var(--ink); color:white; box-shadow:0 4px 12px #44215824; }
+.nav-item:hover:not(.active) { background:#F1EAF6; color:var(--ink); }
+.nav-item:focus-visible,.reset-window:focus-visible { outline:2px solid var(--mp-purple); outline-offset:3px; }
+.input-daterange .form-control,.form-control,.selectize-input,.form-select { border-color:#D9CDE3; }
+.input-daterange .input-group-addon { background:#F4EEF8; color:var(--muted); }
+.reset-window { background:#FBE8CC; color:var(--ink); border-color:#F4DDBB; border-radius:20px; }
+.kpi-card { grid-template-columns:48px minmax(0,1fr) auto; grid-template-rows:1fr; gap:13px; border:1px solid #FFFFFF70; box-shadow:0 4px 12px #5D34751A; }
+.kpi-icon { width:48px; height:48px; display:flex; align-items:center; justify-content:center; border-radius:50%; background:#FFFFFF30; border:1px solid #FFFFFF40; }
+.kpi-icon .mp-icon { width:27px; height:27px; }
+.kpi-copy { min-width:0; }
+.kpi-label { margin-bottom:5px; }
+.kpi-card .kpi-value { grid-column:auto; grid-row:auto; padding-left:0; font-size:30px; color:inherit; }
+.kpi-lavender { background:linear-gradient(115deg,#BEA7D8,#9F83BE 65%,#8D72AE); color:#301840; }
+.kpi-blush { background:linear-gradient(110deg,#CCB1DA,#DFB4D2 68%,#E8C6DC); color:#442158; }
+.kpi-champagne { background:linear-gradient(110deg,#FAEDD3,#F4D8A7 70%,#EFCD96); color:#513A27; }
+.kpi-card .kpi-note { color:inherit; opacity:.88; font-size:11px; }
+.coverage-card { background:radial-gradient(ellipse at 73% 45%,#E6BE9E42,transparent 55%),linear-gradient(120deg,#73579D,#A37BAD 58%,#BD8BB4); border-color:#C5A6D6; color:white; }
+.coverage-card .card-heading h2 { color:white; }
+.coverage-card .scope-badge { color:#FFF8FF; background:#FFFFFF24; border:1px solid #FFFFFF36; }
+.coverage-card .venn-label { fill:#FFF5FF; }
+.coverage-card .venn-count { fill:#FFFFFF; }
+.coverage-card #venn_shared,.coverage-card .venn-shared-label { fill:#3D244C; }
+.coverage-card .card-footnote,.coverage-card .card-footnote strong { color:#FFF3FF; }
+.scope-badge { background:#F3EDF7; color:var(--muted); }
+.key-dot.teal { background:var(--mp-coobserved); }
+.key-dot.neutral { background:var(--mp-not-coobserved); }
+.song-row:hover { background:#F8F3FB; }
+.song-row.is-selected { background:#EDE3F4; border-color:#B39BC7; box-shadow:inset 3px 0 0 var(--mp-selected); }
+.song-name small,.row-status,.selected-meta,.size-key { color:var(--muted); }
+.douyin-text { color:#76559B; }
+.kugou-text { color:var(--mp-kugou-ink); }
+.status-pill { color:#5F3B78; background:#EFE5F5; border-radius:12px; }
+.details-card { background-color:#30183F; background-image:linear-gradient(180deg,#2C173B14,#2C173BBF),linear-gradient(90deg,#2C173BF2 0%,#321C46C7 43%,#3F23566B 75%,#3F235633),url('images/vinyl-reference.png'); background-size:cover; background-position:center; border-color:#674F7D; color:#FFF8FF; }
+.details-card .card-heading h2,.details-card .selected-heading h3,.details-card .detail-metric>strong { color:#FFF8FF; }
+.details-card .scope-badge { background:#FFFFFF1F; color:#FFF1FF; }
+.details-card .selected-meta,.details-card .detail-metric>span,.details-card .detail-note { color:#ECDFF4; }
+.details-card .status-pill { background:#F0DFFA21; color:#F8ECFF; border:1px solid #EBD6FA33; }
+.details-card .detail-counts { border-color:#E9DBF52E; }
+/* Pages 2-4 keep their grids. Only surfaces, series roles and state colours move. */
+.feature-checkbox-scroll input[type=checkbox] { accent-color:var(--mp-purple); }
+.feature-checkbox-scroll .shiny-input-container input:checked { background-color:var(--mp-purple); border-color:var(--mp-purple); }
+.feature-checkbox-scroll .checkbox:has(input:checked) label { color:var(--ink); }
+.feature-link { color:#735194; }
+.feature-link:hover { background:#F4EDF9; color:var(--ink); }
+.feature-filter-group,.duration-item+section { border-color:var(--border); }
+.feature-hint,.feature-note,.feature-denominator,.feature-platform-key,.duration-unit { color:var(--muted); }
+.dyn-label-placeholder>span { background:#F8F3FA; border-color:#E9DFF0; color:#8B7699; }
+.dyn-placeholder-band { background:#F3F0F5; }
+.dyn-table-row.is-selected .dyn-song-cell,.dyn-table-row.is-selected .dyn-lead-cell { background:#F1E8F6; }
+.dyn-table-row.is-selected .dyn-row-select { color:var(--mp-selected); }
+.dyn-table-row.is-selected .dyn-month-block { box-shadow:0 0 0 1px var(--mp-purple); }
+.dyn-month-block:hover,.dyn-month-block:focus-visible { outline-color:var(--mp-purple); }
+.dyn-month-tooltip { border-color:#D7C6E2; color:var(--ink); box-shadow:0 3px 12px #44215820; }
+.dyn-back { border-color:#DDCEE7; color:var(--mp-selected); }
+.dyn-selected-month { background:#F8F2FB; }
+.dyn-selected-counts { border-color:var(--border); }
+.cmp-window { background:#F8F3FA; border-color:var(--border); }
+.cmp-filter-body .selectize-input { border-color:#DFD1E9; }
+.cmp-filter-body .irs--shiny .irs-handle>i:first-child { background:var(--mp-purple); }
+.cmp-kpi.short strong { color:#945B88; }
+.cmp-kpi.stream strong { color:var(--mp-kugou-ink); }
+:is(.cmp-c,.cmp-d)>.card-heading::after { background:var(--mp-purple); mask-image:linear-gradient(90deg,transparent 0 5%,black 5% 12%,transparent 12% 24%,black 24% 31%,transparent 31% 44%,black 44% 51%,transparent 51% 64%,black 64% 71%,transparent 71% 84%,black 84% 91%,transparent 91%); }
+input:focus-visible,.selectize-input.focus { outline-color:var(--mp-purple); }
+/* All image layers are CSS backgrounds: no extra focus surface or pointer target. */
+@media(max-width:1200px) { .brand { min-width:180px; } .nav-item { padding:7px 11px; } }
