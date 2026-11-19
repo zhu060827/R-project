@@ -15,10 +15,10 @@ source("run_app.R")
 
 ## 数据
 
-应用读取上一级提交包中的处理后数据：
+应用读取本包内的处理后数据：
 
 ```text
-../data_submission/data/processed/
+data/processed/
 ```
 
 包括中国平台的四个 CSV 和美国数据的两个 CSV。应用启动时一次性读取数据，筛选和图表均基于内存中的数据运行。
