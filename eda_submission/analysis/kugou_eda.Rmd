@@ -121,7 +121,7 @@ The first panel shows the daily number of new entries into the KuGou Daily Top10
 
 The interactive view complements the static turnover figure by allowing exact dates and daily new-entry counts to be inspected with hover, zoom, and pan controls.
 
-```{r daily-interactive, fig.width=11, fig.height=4.5}
+```{r daily-interactive, include=FALSE, fig.width=11, fig.height=4.5}
 daily_interactive <- plot_ly(
   daily_flow,
   x = ~chart_date,
