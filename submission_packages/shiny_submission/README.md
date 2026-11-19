@@ -1,48 +1,33 @@
 # MusicPulse Shiny Submission
 
-This is the cleaned Shiny submission package for the MusicPulse project. It preserves the four-page interaction design from the supplied `MusicPulse-Final` project while reading the processed datasets already stored in the sibling `data_submission` package.
+四页 Shiny 交互应用：Overview、Music Features、Dynamics、China vs US。
 
-## Run
+## 运行
 
-From this directory:
+在当前目录运行：
 
 ```r
 source("requirements.R")
 source("run_app.R")
 ```
 
-Then open `http://127.0.0.1:8765`.
+然后打开 `http://127.0.0.1:8765`。
 
-The launcher is portable: it resolves the application directory from `run_app.R`, and `R/direct_data.R` reads the six processed CSV inputs from:
+## 数据
+
+应用读取上一级提交包中的处理后数据：
 
 ```text
 ../data_submission/data/processed/
 ```
 
-The Shiny package does not duplicate the large analytical CSVs. Local preview metadata and the permitted audio excerpts remain under `data/music_preview_research/` so the preview interaction is preserved.
+包括中国平台的四个 CSV 和美国数据的两个 CSV。应用启动时一次性读取数据，筛选和图表均基于内存中的数据运行。
 
-## Application structure
+## 目录
 
-- `app.R`: assembles the UI and page server factories.
-- `R/`: data loading, page-specific logic, plots, modules, theme, and preview helpers.
-- `www/`: CSS and JavaScript assets for navigation, plots, styling, and audio controls.
-- `data/music_preview_research/`: preview registries and permitted local preview assets.
-- `requirements.R`: installs only missing R package dependencies.
-- `run_app.R`: the supported local launcher.
-
-## Data mapping
-
-| Shiny input | Processed submission file |
-|---|---|
-| China coding | `../data_submission/data/processed/platform_song_coding.csv` |
-| China daily panel | `../data_submission/data/processed/platform_song_daily_panel.csv` |
-| Douyin native data | `../data_submission/data/processed/douyin_master_dataset.csv` |
-| KuGou native data | `../data_submission/data/processed/kugou_analysis_dataset.csv` |
-| U.S. coding | `../data_submission/data/processed/us/coding_clean.csv` |
-| U.S. daily data | `../data_submission/data/processed/us/daily_clean.csv` |
-
-The app loads these files once when the process starts. Filters operate on the in-memory tables and do not create or overwrite source data.
-
-## Validation
-
-The app was smoke-tested by sourcing `app.R`; the six processed inputs loaded successfully and the Shiny app object was created.
+- `app.R`：应用入口与页面组合
+- `R/`：数据读取、页面逻辑、图表和模块
+- `www/`：页面样式、导航脚本和交互资源
+- `data/music_preview_research/`：音乐预览所需资源
+- `requirements.R`：安装运行依赖
+- `run_app.R`：本地启动脚本
