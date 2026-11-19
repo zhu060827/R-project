@@ -183,6 +183,7 @@ longest <- track |>
     Artist = artist_name,
     Genre = genre_harmonized,
     Mood = mood_grouped,
+    `Song duration (min)` = round(duration_min, 2),
     `Best rank` = peak_rank,
     `Days on chart` = time_on_chart
   ) |>
@@ -191,7 +192,7 @@ kable(
   longest,
   caption = "Songs with the longest observed Daily Top100 persistence",
   format = "html",
-  align = c("l", "l", "l", "l", "r", "r"),
+  align = c("l", "l", "l", "l", "r", "r", "r"),
   table.attr = 'class="kugou-table compact-table"'
 )
 ```
