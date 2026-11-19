@@ -22,10 +22,9 @@ direct_memberships<-function(coding){
  all%>%dplyr::group_by(platform,native_record_id)%>%dplyr::mutate(candidate_id_count=dplyr::n_distinct(cross_platform_song_id))%>%dplyr::ungroup()
 }
 load_direct_dashboard_data<-function(project,app_dir){
- # The submission package reuses the processed-data package one level above it.
- # This keeps large analytical CSVs out of the Shiny source package while
- # preserving the same six-table application interface.
- data_root <- normalizePath(file.path(app_dir, '..', 'data_submission', 'data', 'processed'), winslash='/', mustWork=TRUE)
+ # All processed analytical inputs are bundled inside this Shiny package so
+ # the submitted folder can run independently.
+ data_root <- normalizePath(file.path(app_dir, 'data', 'processed'), winslash='/', mustWork=TRUE)
  cn<-data_root;us<-file.path(data_root,'us')
  coding<-direct_read(file.path(cn,'platform_song_coding.csv'),readr::cols(.default=readr::col_character(),genre_platform_conflict=readr::col_logical()))
  panel<-direct_read(file.path(cn,'platform_song_daily_panel.csv'),readr::cols_only(cross_platform_song_id=readr::col_character(),observation_date=readr::col_date(),douyin_observed=readr::col_integer(),kugou_observed=readr::col_integer(),douyin_rank=readr::col_double(),kugou_rank=readr::col_double()))
