@@ -1,0 +1,5 @@
+# Keep large submission data in Git LFS instead of normal Git blobs.
+submission_packages/**/data/raw/** filter=lfs diff=lfs merge=lfs -text
+submission_packages/**/data/processed/**/*.csv filter=lfs diff=lfs merge=lfs -text
+submission_packages/data_submission/data/processed/**/*.csv filter=lfs diff=lfs merge=lfs -text
+submission_packages/shiny_submission/data/cache/*.rds filter=lfs diff=lfs merge=lfs -text
