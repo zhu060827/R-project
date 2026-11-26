@@ -48,4 +48,4 @@ The reports are descriptive EDA. Douyin source usage counts are retained as sour
 
 ## Submission alignment
 
-This package addresses the EDA deliverable in the course requirements: reproducible R Markdown reports, visual exploration, written interpretation, data-quality decisions, initial findings, and limitations. The wider final-project package should additionally include the literature review, dashboard design, Shiny application, final report, slides, and individual reflections.
+This package addresses the EDA deliverable in the course requirements: reproducible R Markdown reports, visual exploration, written interpretation, data-quality decisions, initial findings, and limitations. The wider final-project package additionally includes the literature review, dashboard design, Shiny application, final report, slides, and individual reflections. In this workspace, the non-code final materials belong in `../final_materials/`, while the formal Shiny application is in `../shiny_submission/`.
