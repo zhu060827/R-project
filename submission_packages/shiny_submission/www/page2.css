@@ -15,7 +15,35 @@
 .feature-checkbox-scroll { overflow:auto; min-height:0; scrollbar-width:thin; }
 .feature-checkbox-scroll .shiny-input-container { width:100%; margin:0; }
 .feature-checkbox-scroll .checkbox { margin:5px 3px; font-size:12px; line-height:1.4; }
-.feature-checkbox-scroll input { accent-color:var(--blue); }
+.feature-checkbox-scroll input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 15px;
+  height: 15px;
+  margin: 0 7px 0 0;
+  border: 1.5px solid #9aa7b2;
+  border-radius: 3px;
+  background: #fff;
+  display: inline-grid;
+  place-content: center;
+  vertical-align: -2px;
+}
+.feature-checkbox-scroll input[type="checkbox"]::before {
+  content: "";
+  width: 8px;
+  height: 4px;
+  border-left: 2px solid #fff;
+  border-bottom: 2px solid #fff;
+  transform: rotate(-45deg) scale(0);
+  transform-origin: center;
+}
+.feature-checkbox-scroll input[type="checkbox"]:checked {
+  background: var(--blue);
+  border-color: var(--blue);
+}
+.feature-checkbox-scroll input[type="checkbox"]:checked::before {
+  transform: rotate(-45deg) scale(1);
+}
 .feature-platform-key { display:flex; flex-wrap:wrap; gap:16px; padding:0 16px 3px; font-size:10.5px; color:var(--muted); }
 .feature-platform-key span { display:flex; align-items:center; gap:5px; }
 .feature-platform-key i { display:inline-block; width:8px; height:8px; border-radius:2px; }

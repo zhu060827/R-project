@@ -1,4 +1,5 @@
-feature_colours <- mp_theme$platform[c('Douyin','Kugou')]
+if (!exists('mp_theme', inherits = TRUE)) mp_theme <- list(ink='#442158', muted='#705F7D', purple='#9475BE', grid='#EFEAF3', border='#EAE3EF', selected='#59316F', platform=c(Douyin='#9475BE',Kugou='#F2C987'), cloud=c('#9475BE','#D18CB8','#C69C61','#AF77B1','#775398','#D7AC72','#B9789C','#8C73AE'))
+feature_colours <- c(Douyin='#9475BE', Kugou='#F2C987')
 feature_pct <- function(x) ifelse(is.na(x), 'N/A', sprintf('%.1f%%', x))
 feature_plot_layout <- function(p, ...) plotly::config(plotly::layout(p,
   font = list(family = 'system-ui, sans-serif', color = mp_theme$ink, size = 11),
@@ -148,3 +149,4 @@ page2_cloud_ui <- function(words) {
       `data-keyword` = x$keyword[i], `data-weight` = x$weight[i],
       shiny::tags$title(paste0(x$labels[i], '; visual score: ', x$weight[i], '; not lyric frequency')), x$keyword[i])))
 }
+if (!exists('mp_theme', inherits = TRUE)) mp_theme <- list(ink='#442158', muted='#705F7D', purple='#9475BE', grid='#EFEAF3', border='#EAE3EF', selected='#59316F', platform=c(Douyin='#9475BE',Kugou='#F2C987'), cloud=c('#9475BE','#D18CB8','#C69C61','#AF77B1','#775398','#D7AC72','#B9789C','#8C73AE'))

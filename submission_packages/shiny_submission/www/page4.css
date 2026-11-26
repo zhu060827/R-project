@@ -6,8 +6,11 @@
 .app-shell.is-compare .compare-header-note { display:block; }
 .page4-view { display:grid; grid-template-columns:minmax(225px,20%) minmax(0,1fr); grid-template-rows:minmax(0,1fr) 18px; gap:12px; min-height:0; }
 .page4-view .dashboard-card { overflow:hidden; min-width:0; min-height:0; }
-.cmp-sidebar { grid-column:1; grid-row:1; }
-.cmp-filter-body { padding:2px 14px 8px; overflow-y:auto; scrollbar-width:thin; min-height:0; }
+.cmp-sidebar { grid-column:1; grid-row:1; min-height:0; }
+.cmp-sidebar > .dashboard-card { min-height:0; }
+.cmp-selected-data { border-top:1px solid var(--border); margin:10px 0 0; padding:12px 0 0; }
+.cmp-selected-data h3 { margin:0 0 9px; color:var(--ink); font-size:17px; line-height:1.2; }
+.cmp-filter-body { padding:2px 14px 8px; overflow:visible; min-height:0; }
 .cmp-filter-body .shiny-input-container { width:100%!important; margin-bottom:6px; }
 .cmp-filter-body .control-label { color:var(--muted); font-size:11px; font-weight:600; margin-bottom:5px; }
 .cmp-filter-body .selectize-control { margin:0; }
@@ -32,9 +35,10 @@
 .cmp-kpi-pair strong { font-size:22px; font-weight:650; letter-spacing:-.5px; }
 .cmp-kpi.short strong { color:var(--teal); }
 .cmp-kpi.stream strong { color:var(--blue); }
-.cmp-sidebar-note { display:flex; flex-direction:column; gap:4px; font-size:10px; color:var(--muted); line-height:1.35; padding-top:8px; }
+.cmp-sidebar-note { display:block; font-size:10px; color:var(--muted); line-height:1.35; padding:8px 0 2px; margin:0; }
 .cmp-sidebar-note strong { font-weight:600; }
-.cmp-charts { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); grid-template-rows:repeat(2,minmax(0,1fr)); gap:12px; min-width:0; min-height:0; }
+.cmp-main { grid-column:2; grid-row:1; display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); grid-template-rows:repeat(2,minmax(0,1fr)); gap:12px; min-width:0; min-height:0; }
+.cmp-main > .dashboard-card { min-height:0; }
 .page4-view .card-heading { padding:13px 14px 6px; }
 .page4-view .card-heading h2 { font-size:14px; line-height:1.25; }
 .cmp-subtitle { font-size:10px; color:var(--muted); padding:0 14px 4px; line-height:1.35; flex-shrink:0; }
@@ -45,12 +49,13 @@
 .cmp-note { margin:0; padding:4px 14px 9px; font-size:9.5px; line-height:1.4; color:var(--muted); flex-shrink:0; }
 .cmp-axis-note { display:flex; align-items:center; justify-content:space-between; gap:3px; padding:2px 13px; font-size:8.5px; color:var(--muted); flex-shrink:0; }
 .cmp-axis-note strong { font-weight:500; font-size:9px; }
-.cmp-page-note { grid-column:1/-1; font-size:9.5px; color:var(--muted); text-align:center; align-self:center; }
+.cmp-page-note { display:none!important; }
 @media(min-width:1650px) {
- .page4-view,.cmp-charts { gap:16px; }
+ .page4-view,.cmp-main { gap:16px; }
  .page4-view .card-heading h2 { font-size:16px; }
  .cmp-subtitle,.cmp-note { font-size:11px; }
  .cmp-filter-body { padding:4px 18px 18px; }
+ .cmp-selected-data h3 { font-size:19px; }
  .cmp-filter-body .shiny-input-container { margin-bottom:18px; }
  .cmp-filter-body .control-label { font-size:12px; }
  .cmp-filter-body .selectize-input { min-height:38px; font-size:13px; }
@@ -63,7 +68,7 @@
 }
 @media(max-width:1150px) {
  .page4-view { grid-template-columns:210px minmax(0,1fr); }
- .cmp-charts { min-width:740px; }
+ .cmp-main { min-width:740px; }
  .app-shell.is-compare { overflow-x:auto; }
 }
 

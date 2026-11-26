@@ -32,8 +32,10 @@ mp_preview_permission <- function(previews,x) {
      !mp_has_text(x$permission_evidence_file)||!mp_has_text(x$permission_evidence_sha256))return(FALSE)
   expected<-'data/music_preview_research/local_video/USER_PERMISSION_RECORD.md'
   if(!identical(x$permission_evidence_file,expected))return(FALSE)
-  path<-file.path(attr(previews,'project'),expected)
-  file.exists(path)&&identical(digest::digest(file=path,algo='sha256'),x$permission_evidence_sha256)
+  project<-attr(previews,'project')
+  candidates<-unique(c(file.path(project,expected),file.path(getwd(),expected)))
+  any(vapply(candidates,function(path)
+    file.exists(path)&&identical(digest::digest(file=path,algo='sha256'),x$permission_evidence_sha256),logical(1)))
 }
 mp_preview_source <- function(previews,id) {
   x<-mp_preview_row(previews,id)
@@ -81,7 +83,7 @@ mp_preview_dialog <- function(previews,id) {
   source<-mp_preview_source(previews,id)
   media<-if(is.null(source))shiny::tags$div(class='mp-preview-empty',shiny::tags$strong('Preview unavailable'),
     shiny::tags$p('A verified, authorized Douyin excerpt is not available for this candidate.'))
-  else if(source$type=='audio')shiny::tags$audio(id='mp_preview_audio',controls=NA,preload='metadata',
+  else if(source$type=='audio')shiny::tags$audio(id='mp_preview_audio',controls=NA,preload='none',
     src=if(!identical(x$preview_type,'local_audio'))source$url else NULL,
     `data-local-preview-src`=if(identical(x$preview_type,'local_audio'))source$url else NULL,
     `aria-label`=paste('Audio preview',x$song_title),'Your browser does not support audio playback.')

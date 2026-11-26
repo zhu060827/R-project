@@ -17,6 +17,7 @@ submission_packages/
 
 - 所有 Shiny 修改、测试和部署只使用 `shiny_submission/`。
 - 大型 CSV 必须保留在本地最终提交包中；GitHub 镜像可使用 Git LFS 或只保存源代码。
+- 仓库根目录的 `.gitattributes` 已为大型原始数据、处理后 CSV 和 Shiny 缓存配置 Git LFS 规则。
 - `eda_submission/` 保存可重现源文件和可直接阅读的 HTML 报告。
 - 原始采集数据保留在 `data_processing/`，不与展示层代码混合。
 - `.DS_Store`、`.Rhistory` 和 `Rplots.pdf` 属于本地临时文件，不是项目成果。

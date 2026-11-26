@@ -1,4 +1,5 @@
-cmp_colours<-c(mp_theme$direction,mp_theme$country,mp_theme$platform)
+if (!exists('mp_theme', inherits = TRUE)) mp_theme <- list(ink='#442158', muted='#705F7D', purple='#9475BE', grid='#EFEAF3', border='#EAE3EF', selected='#59316F', platform=c(Douyin='#9475BE',Kugou='#F2C987'), country=c(China='#8767B2','United States'='#C983A5'), direction=c('Short-video first'='#BA8BB5','Streaming first'='#D6AE6F','Same day'='#D7D1DD'))
+cmp_colours<-c('Short-video first'='#BA8BB5','Streaming first'='#D6AE6F','Same day'='#D7D1DD',China='#8767B2','United States'='#C983A5',Douyin='#9475BE',Kugou='#F2C987',TikTok='#65447E',Spotify='#C56F9B')
 cmp_pct<-function(x)ifelse(is.na(x),'—',sprintf('%.1f%%',100*x))
 cmp_genre_ticks<-c('Pop','Rock','R&B / Soul','Hip Hop / Rap','Dance /<br>Electronic','Other')
 cmp_layout<-function(p,...){
@@ -126,3 +127,4 @@ cmp_diverging_plot<-function(s){
  # The extra right gutter keeps +100 pp endpoint text inside the card at 1440px.
  do.call(cmp_layout,c(list(p=p,margin=list(l=102,r=44,t=31,b=25),annotations=annotations,shapes=shapes,barmode='overlay'),axes))
 }
+if (!exists('mp_theme', inherits = TRUE)) mp_theme <- list(ink='#442158', muted='#705F7D', purple='#9475BE', grid='#EFEAF3', border='#EAE3EF', selected='#59316F', platform=c(Douyin='#9475BE',Kugou='#F2C987'), country=c(China='#8767B2','United States'='#C983A5'), direction=c('Short-video first'='#BA8BB5','Streaming first'='#D6AE6F','Same day'='#D7D1DD'))

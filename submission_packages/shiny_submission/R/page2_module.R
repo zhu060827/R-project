@@ -35,6 +35,7 @@ page2_ui <- function(data) {
 }
 
 make_page2_server <- function(data) function(input, output, session) {
+  active <- shiny::reactive(if (is.null(input$active_page)) 'overview' else input$active_page)
   summary <- shiny::reactive({ shiny::req(input$date_range); page2_window_summary(data, input$date_range) })
   for(attribute in c('genres', 'moods')) local({
     a <- attribute; id <- paste0('feature_', a)
@@ -52,9 +53,9 @@ make_page2_server <- function(data) function(input, output, session) {
     x <- summary()$duration
     paste0('Valid durations: Douyin ', sum(x$platform == 'Douyin' & x$valid), ' materials · Kugou ', sum(x$platform == 'Kugou' & x$valid), ' tracks.')
   })
-  output$feature_genre_plot <- plotly::renderPlotly(page2_genre_plot(summary(), input$feature_genres, data$genre_order))
-  output$feature_mood_plot <- plotly::renderPlotly(page2_mood_plot(summary(), input$feature_moods, data$mood_order))
-  output$duration_douyin <- plotly::renderPlotly(page2_duration_plot(summary(), 'Douyin'))
-  output$duration_kugou <- plotly::renderPlotly(page2_duration_plot(summary(), 'Kugou'))
-  output$feature_keywords <- shiny::renderUI(page2_cloud_ui(page2_keyword_summary(data$keywords, input$feature_genres, input$feature_moods)))
+  output$feature_genre_plot <- plotly::renderPlotly({ shiny::req(active() == 'features'); page2_genre_plot(summary(), input$feature_genres, data$genre_order) })
+  output$feature_mood_plot <- plotly::renderPlotly({ shiny::req(active() == 'features'); page2_mood_plot(summary(), input$feature_moods, data$mood_order) })
+  output$duration_douyin <- plotly::renderPlotly({ shiny::req(active() == 'features'); page2_duration_plot(summary(), 'Douyin') })
+  output$duration_kugou <- plotly::renderPlotly({ shiny::req(active() == 'features'); page2_duration_plot(summary(), 'Kugou') })
+  output$feature_keywords <- shiny::renderUI({ shiny::req(active() == 'features'); page2_cloud_ui(page2_keyword_summary(data$keywords, input$feature_genres, input$feature_moods)) })
 }

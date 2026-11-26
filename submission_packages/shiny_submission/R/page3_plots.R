@@ -1,4 +1,5 @@
-dyn_colours<-mp_theme$platform[c('Douyin','Kugou')]
+if (!exists('mp_theme', inherits = TRUE)) mp_theme <- list(ink='#442158', muted='#705F7D', purple='#9475BE', grid='#EFEAF3', border='#EAE3EF', selected='#59316F', platform=c(Douyin='#9475BE',Kugou='#F2C987'), coobserved=c(yes='#A18ABB', no='#E8C483'))
+dyn_colours<-c(Douyin='#9475BE', Kugou='#F2C987')
 dyn_date<-function(x)ifelse(is.na(x),'N/A',format(as.Date(x),'%Y-%m-%d'))
 dyn_lead_text<-function(x)ifelse(is.na(x$lead_lag_days),'One-platform observation',ifelse(x$lead_lag_days==0L,'Same day',paste0(x$lead_direction,' · ',abs(x$lead_lag_days),'d')))
 dyn_row_labels<-function(top)paste0(top$slot,'. ',ifelse(top$placeholder,'No eligible song',stringr::str_trunc(top$song_title,14)))
@@ -89,3 +90,4 @@ dyn_matrix_ui<-function(window,top,matrix,selected=NULL,previews=NULL){
      }),shiny::tags$td(class='dyn-lead-cell',dyn_lead_text(row)))
    }))))
 }
+if (!exists('mp_theme', inherits = TRUE)) mp_theme <- list(ink='#442158', muted='#705F7D', purple='#9475BE', grid='#EFEAF3', border='#EAE3EF', selected='#59316F', platform=c(Douyin='#9475BE',Kugou='#F2C987'), coobserved=c(yes='#A18ABB', no='#E8C483'))

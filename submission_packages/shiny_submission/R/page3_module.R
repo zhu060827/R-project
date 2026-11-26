@@ -2,28 +2,28 @@ page3_ui<-function(data){
   legend<-shiny::tags$div(class='dyn-legend',shiny::tags$span(shiny::tags$i(style=paste0('background:',dyn_colours[['Douyin']])),'Douyin'),shiny::tags$span(shiny::tags$i(style=paste0('background:',dyn_colours[['Kugou']])),'Kugou'))
   plot<-function(id)shiny::tags$div(class='dyn-plot',plotly::plotlyOutput(id,height='100%'))
   shiny::tags$section(id='page3_view',class='page3-view',hidden=NA,
-    shiny::tags$article(class='dashboard-card dyn-a',card_header('A · Sound Appearance Timeline',shiny::tags$span(class='scope-badge',shiny::textOutput('dyn_top_count',inline=TRUE))),
+    shiny::tags$article(class='dashboard-card dyn-a',card_header('Sound Appearance Timeline',shiny::tags$span(class='scope-badge',shiny::textOutput('dyn_top_count',inline=TRUE))),
       shiny::tags$div(class='dyn-controls',shiny::selectInput('dyn_category','Category',c('All Songs','Genre','Mood')),
         shiny::uiOutput('dyn_label_ui'),shiny::selectInput('dyn_sort','Sort By',c('Total Unique Observed Days'='union','Same-day Overlap Days'='overlap','First-observed Gap'='gap','Douyin Observed Days'='douyin','Kugou Observed Days'='kugou'),selected='union')),
-      plot('dyn_timeline'),legend,shiny::tags$p(class='dyn-note','Actual observed runs; gaps remain visible. Click a song or segment to inspect.')),
-    shiny::tags$article(class='dashboard-card dyn-b',card_header('B · Lead–Lag Distribution',
+      plot('dyn_timeline'),legend,shiny::tags$p(class='dyn-note','Observed periods on Douyin and KuGou; gaps indicate no recorded observation. Click a song or segment to inspect.')),
+    shiny::tags$article(class='dashboard-card dyn-b',card_header('Lead–Lag Distribution',
         shiny::radioButtons('dyn_b_attribute',NULL,c('Mood','Genre'),selected='Mood',inline=TRUE)),
       shiny::tags$div(class='dyn-subtitle',shiny::textOutput('dyn_b_count',inline=TRUE)),plot('dyn_scatter'),
-      shiny::tags$p(class='dyn-note','← Kugou earlier · Same day at 0 · Douyin earlier →',shiny::tags$br(),'Dark ticks = category medians · all eligible candidates, not only Top 10.')),
-    shiny::tags$article(class='dashboard-card dyn-c',card_header('C · Monthly Visibility Matrix',shiny::tags$span(class='scope-badge','Same Top 10 as A')),
+      shiny::tags$p(class='dyn-note','Positive values mean Douyin was observed earlier; negative values mean KuGou was earlier. Dark ticks show category medians.')),
+    shiny::tags$article(class='dashboard-card dyn-c',card_header('Monthly Visibility Matrix',shiny::tags$span(class='scope-badge','Same Top 10')),
       shiny::tags$div(id='dyn_matrix_scroll',class='dyn-matrix-scroll',shiny::uiOutput('dyn_matrix')),
       shiny::tags$div(class='dyn-legend',shiny::tags$span(shiny::tags$i(style=paste0('background:',dyn_colours[['Douyin']])),'D · left cell'),
         shiny::tags$span(shiny::tags$i(style=paste0('background:',dyn_colours[['Kugou']])),'K · right cell'),shiny::tags$span('Bold D / K / = · first-observed month')),
-      shiny::tags$p(class='dyn-note','Intensity = observed / valid archive days · neutral = 0 · scroll → for all months.')),
+      shiny::tags$p(class='dyn-note','Cell color shows monthly visibility; bold D / K / = marks the first-observed platform.')),
     shiny::tags$article(class='dashboard-card dyn-d',shiny::uiOutput('dyn_insights')),
-    shiny::tags$div(class='dyn-page-note','First observed within selected window · 95 title-matched shared-song candidates, not verified recordings · Observed order does not establish diffusion.'))
+    shiny::tags$div(class='dyn-page-note',style='display:none;'))
 }
 
 dyn_metric<-function(label,value)shiny::tags$div(class='dyn-metric',shiny::tags$span(label),shiny::tags$strong(value))
 dyn_overview_ui<-function(top,filter_label){
   x<-top[!top$placeholder,];valid<-sum(!is.na(x$lead_lag_days));counts<-c(sum(x$lead_lag_days>0,na.rm=TRUE),sum(x$lead_lag_days<0,na.rm=TRUE),sum(x$lead_lag_days==0,na.rm=TRUE))
   median_gap<-if(valid)paste0(format(stats::median(x$absolute_gap,na.rm=TRUE),trim=TRUE),'d') else 'N/A'
-  shiny::tagList(card_header('Top 10 Cross-platform Insights',shiny::tags$span(class='scope-badge','Overview')),
+  shiny::tagList(card_header('Cross-platform Insights',shiny::tags$span(class='scope-badge','Overview')),
     shiny::tags$div(class='dyn-d-body',
       shiny::tags$div(class='dyn-direction-counts',dyn_metric('Douyin earlier',counts[1]),dyn_metric('Kugou earlier',counts[2]),dyn_metric('Same day',counts[3])),
       shiny::tags$div(class='dyn-overview-gap',dyn_metric('Median absolute first-observed gap',median_gap),shiny::tags$span(paste(valid,'valid dual-platform candidates'))),
@@ -31,7 +31,7 @@ dyn_overview_ui<-function(top,filter_label){
       shiny::tags$p(class='dyn-composition-note',paste0('Direction composition among ',valid,' candidates with both first dates.')),
       shiny::tags$div(class='dyn-overview-context',shiny::tags$strong(filter_label),shiny::tags$span(paste(nrow(x),'eligible candidates; grey placeholders excluded.')),
         shiny::tags$span(paste('Insufficient dual-platform data:',nrow(x)-valid))),
-      shiny::tags$p(class='dyn-detail-note','Click A, B or C to inspect one candidate. Within-window first dates are affected by the selected boundary; they are not release or original diffusion dates.')))
+      shiny::tags$p(class='dyn-detail-note','Click a chart mark to inspect one candidate. Dates are archive observations, not release or diffusion dates.')))
 }
 
 dyn_detail_ui<-function(x,in_top,origin,selected_month,monthly,previews=NULL){
@@ -48,6 +48,7 @@ dyn_detail_ui<-function(x,in_top,origin,selected_month,monthly,previews=NULL){
 }
 
 make_page3_server<-function(data,previews=NULL)function(input,output,session){
+  active<-shiny::reactive(if (is.null(input$active_page)) 'overview' else input$active_page)
   window<-shiny::reactive({shiny::req(input$date_range);dyn_window(data,input$date_range)})
   choices<-shiny::reactive(if(identical(input$dyn_category,'Mood'))data$mood_order else data$genre_order)
   output$dyn_label_ui<-shiny::renderUI({
@@ -73,10 +74,11 @@ make_page3_server<-function(data,previews=NULL)function(input,output,session){
   output$dyn_top_count<-shiny::renderText(paste(sum(!top()$placeholder),'/ 10 candidates'))
   output$dyn_b_count<-shiny::renderText({a<-if(is.null(input$dyn_b_attribute))'Mood' else input$dyn_b_attribute;x<-dyn_scatter_data(window(),a,if(a=='Mood')data$mood_order else data$genre_order)
     paste(dplyr::n_distinct(x$cross_platform_song_id),'classified candidates ·',nrow(x),'label memberships')})
-  output$dyn_timeline<-plotly::renderPlotly(dyn_timeline_plot(window(),top(),selected_song_id()))
-  output$dyn_scatter<-plotly::renderPlotly({shiny::req(input$dyn_b_attribute);dyn_scatter_plot(window(),input$dyn_b_attribute,if(input$dyn_b_attribute=='Mood')data$mood_order else data$genre_order,selected_song_id())})
-  output$dyn_matrix<-shiny::renderUI(dyn_matrix_ui(window(),top(),matrix(),selected_song_id(),previews))
+  output$dyn_timeline<-plotly::renderPlotly({shiny::req(active()=='dynamics');dyn_timeline_plot(window(),top(),selected_song_id())})
+  output$dyn_scatter<-plotly::renderPlotly({shiny::req(active()=='dynamics',input$dyn_b_attribute);dyn_scatter_plot(window(),input$dyn_b_attribute,if(input$dyn_b_attribute=='Mood')data$mood_order else data$genre_order,selected_song_id())})
+  output$dyn_matrix<-shiny::renderUI({shiny::req(active()=='dynamics');dyn_matrix_ui(window(),top(),matrix(),selected_song_id(),previews)})
   output$dyn_insights<-shiny::renderUI({
+    shiny::req(active()=='dynamics')
     id<-selected_song_id()
     if(is.null(id)){
       sortnames<-c(union='Total Unique Observed Days',overlap='Same-day Overlap Days',gap='First-observed Gap',douyin='Douyin Observed Days',kugou='Kugou Observed Days')

@@ -1,3 +1,4 @@
+if (!exists('mp_theme', inherits = TRUE)) mp_theme <- list(ink='#442158', muted='#705F7D', purple='#9475BE', grid='#EFEAF3', border='#EAE3EF', selected='#59316F', coobserved=c(yes='#A18ABB', no='#E8C483'))
 venn_diagram <- function(coverage) {
   htmltools::HTML(sprintf('<svg class="venn-svg" viewBox="0 0 480 230" role="img" aria-labelledby="venn-title venn-desc">
   <title id="venn-title">Platform coverage, full dataset</title><desc id="venn-desc">Douyin only %s; shared %s; Kugou only %s. Conceptual areas are not proportional.</desc>
@@ -60,3 +61,4 @@ build_performance_plot <- function(stats, selected_id, data) {
   plot <- plotly::config(plot, displayModeBar = FALSE, displaylogo = FALSE, responsive = TRUE, scrollZoom = FALSE)
   htmlwidgets::onRender(plot, "function(el) { el.on('plotly_click', function(e) { if(e.points && e.points.length) { var p=e.points[0]; var id=p.customdata || p.key; if(id) Shiny.setInputValue('bubble_select', id, {priority:'event'}); } }); }")
 }
+if (!exists('mp_theme', inherits = TRUE)) mp_theme <- list(ink='#442158', muted='#705F7D', purple='#9475BE', grid='#EFEAF3', border='#EAE3EF', selected='#59316F', coobserved=c(yes='#A18ABB', no='#E8C483'))

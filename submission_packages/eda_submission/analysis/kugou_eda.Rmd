@@ -1,0 +1,504 @@
+---
+title: "KuGou Daily Top100 Exploratory Data Analysis"
+author: "Course Project"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+---
+
+<style>
+.kugou-table { width: 100%; border-collapse: collapse; margin: 12px 0 22px 0; font-family: Arial, sans-serif; font-size: 13px; color: #334155; }
+.kugou-table th { background: #1F4E79; color: #FFFFFF; font-weight: 600; padding: 9px 12px; text-align: left; border: none; }
+.kugou-table td { padding: 8px 12px; border-bottom: 1px solid #DCE6F0; }
+.kugou-table tr:nth-child(even) { background: #F3F7FB; }
+.kugou-table tr:hover { background: #E7F0FA; }
+.compact-table { font-size: 12px; }
+.compact-table td, .compact-table th { padding: 6px 10px; }
+</style>
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE,
+                      fig.width = 9, fig.height = 5, dpi = 120,
+                      fig.keep = "last")
+library(tidyverse)
+library(lubridate)
+library(knitr)
+library(patchwork)
+library(plotly)
+library(ggrepel)
+kugou_blue <- "#3D7CC9"
+kugou_navy <- "#1F4E79"
+kugou_sky <- "#A7C7E7"
+kugou_orange <- "#F4A261"
+
+theme_kugou <- theme_minimal(base_family = "sans", base_size = 10) +
+  theme(
+    plot.title = element_text(family = "sans", face = "bold", size = 15, hjust = 0, color = "#263B4D"),
+    plot.subtitle = element_text(family = "sans", size = 8.5, color = "#5B6573", hjust = 0),
+    plot.caption = element_text(family = "sans", size = 7.5, color = "#5B6573", hjust = 0),
+    axis.title = element_text(family = "sans", size = 9, color = kugou_navy),
+    axis.text = element_text(family = "sans", size = 8, color = "#4B5563"),
+    legend.title = element_text(family = "sans"),
+    legend.text = element_text(family = "sans"),
+    panel.grid.minor = element_blank(),
+    panel.grid.major.x = element_blank(),
+    panel.grid.major.y = element_line(color = "#E5E7EB", linewidth = .35),
+    panel.border = element_blank(),
+    plot.background = element_rect(fill = "#FFFFFF", color = NA),
+    panel.background = element_rect(fill = "#FFFFFF", color = NA)
+  )
+root <- normalizePath("..", mustWork = TRUE)
+data_root <- if (dir.exists(file.path(root, "..", "data_submission"))) normalizePath(file.path(root, "..", "data_submission", "data")) else if (dir.exists(file.path(root, "data_submission"))) file.path(root, "data_submission", "data") else file.path(root, "data")
+canonical <- read_csv(file.path(data_root, "processed/kugou_analysis_dataset.csv"), show_col_types = FALSE)
+daily <- canonical |> mutate(chart_date = as.Date(chart_date))
+track <- canonical |> distinct(kugou_song_id, .keep_all = TRUE) |> mutate(release_date = as.Date(release_date), duration_min = duration_ms / 60000)
+```
+
+# 1. Data and Scope
+
+Data quality is checked before any exploratory figure is produced. This report analyses KuGou Daily Top100 as a standalone dataset. Spotify and Douyin fields are not used. The analysis defines the observation unit clearly, separates actual observations from calendar coverage, retains missing values as missing rather than converting them to zero, and avoids duplicate weighting.
+
+# 2. Data Structure and Quality
+
+```{r structure}
+cat(sprintf("**Coverage summary:** %s daily records, %s unique tracks, across %s–%s (%s days).", format(nrow(daily), big.mark = ","), format(n_distinct(track$kugou_song_id), big.mark = ","), min(daily$chart_date), max(daily$chart_date), n_distinct(daily$chart_date)))
+```
+
+```{r quality}
+quality <- tibble(
+  Check = c("Exactly 100 records per day", "Duplicate date-rank pairs", "Missing chart dates", "Missing track IDs", "Missing track names", "Missing artist names", "Missing ranks", "Missing Genre labels", "Missing Mood labels", "Missing duration values"),
+  Status = c(
+    if_else(all(daily |> count(chart_date) |> pull(n) == 100), "PASS", "CHECK"),
+    if_else((daily |> count(chart_date, rank) |> filter(n > 1) |> nrow()) == 0, "PASS", "CHECK"),
+    if_else(sum(is.na(daily$chart_date)) == 0, "PASS", "CHECK"),
+    if_else(sum(is.na(daily$kugou_song_id) | daily$kugou_song_id == "") == 0, "PASS", "CHECK"),
+    if_else(sum(is.na(daily$track_name) | daily$track_name == "") == 0, "PASS", "CHECK"),
+    if_else(sum(is.na(track$artist_name) | track$artist_name == "") == 0, "PASS", "CHECK"),
+    if_else(sum(is.na(daily$rank)) == 0, "PASS", "CHECK"),
+    if_else(sum(is.na(daily$genre_category) | daily$genre_category == "") == 0, "PASS", "CHECK"),
+    if_else(sum(is.na(daily$mood_category) | daily$mood_category == "") == 0, "PASS", "CHECK"),
+    if_else(sum(is.na(daily$duration_ms)) == 0, "PASS", "CHECK")
+  ),
+  Count = c(
+    sum(daily |> count(chart_date) |> pull(n) != 100),
+    daily |> count(chart_date, rank) |> filter(n > 1) |> nrow(),
+    sum(is.na(daily$chart_date)),
+    sum(is.na(daily$kugou_song_id) | daily$kugou_song_id == ""),
+    sum(is.na(daily$track_name) | daily$track_name == ""),
+    sum(is.na(track$artist_name) | track$artist_name == ""),
+    sum(is.na(daily$rank)),
+    sum(is.na(daily$genre_category) | daily$genre_category == ""),
+    sum(is.na(daily$mood_category) | daily$mood_category == ""),
+    sum(is.na(daily$duration_ms))
+  )
+)
+kable(quality, format = "html", align = c("l", "c", "r"), table.attr = 'class="kugou-table compact-table"')
+```
+
+Each row is interpreted as one track-date chart observation. An absent track is not recoded as zero popularity, and `time_on_chart` is treated as observed chart persistence within this archive rather than an official lifetime measure. Because the KuGou Daily Top100 is complete for every date, an additional observation-density figure would be redundant; turnover and persistence are more informative.
+
+The report follows the chart lifecycle: first, it describes daily chart turnover; second, it examines how long songs remain visible and identifies the longest-running songs; third, it evaluates artist-level chart presence and ranking performance; finally, it examines genre, mood, and duration patterns. Cross-platform overlap, temporal Jaccard, and first-observed timing are reserved for the later integrated analysis because they require Douyin data.
+
+# 3. Exploratory Analysis
+
+## 3.1 Daily Chart Turnover
+
+```{r flow, fig.width=10, fig.height=8}
+first_date <- min(daily$chart_date)
+daily_flow <- daily |> filter(chart_date > first_date) |> group_by(chart_date) |> summarise(new_entries = sum(is.na(pre_rank) | pre_rank == 0, na.rm = TRUE), .groups = "drop")
+monthly_flow <- daily_flow |> mutate(month = floor_date(chart_date, "month")) |> group_by(month) |> summarise(mean_new_entries = mean(new_entries), .groups = "drop")
+p_daily <- ggplot(daily_flow, aes(chart_date, new_entries)) + geom_line(color = kugou_blue, linewidth = .55) + geom_smooth(se = FALSE, color = kugou_orange, linewidth = .8) + geom_point(data = daily_flow |> slice_max(new_entries, n = 1), color = kugou_orange, size = 2) + geom_text(data = daily_flow |> slice_max(new_entries, n = 1), aes(label = paste0("Peak: ", new_entries)), nudge_y = 3, color = kugou_navy, size = 3.2, family = "sans") + labs(title = "Daily New Songs Number Entering the KuGou Daily Top100", x = "Chart date", y = "Number of new songs") + theme_kugou
+p_month <- ggplot(monthly_flow, aes(month, mean_new_entries, fill = mean_new_entries)) + geom_col(width = 25) + scale_fill_gradient(low = "#FAD7B1", high = kugou_orange, guide = "none") + geom_text(aes(label = round(mean_new_entries, 1)), vjust = -0.35, size = 2.8, color = "#A94F3B") + labs(title = "Average Daily Number of New Songs by Month", x = "Month", y = "Average new songs per day") + theme_kugou + theme(axis.text.x = element_text(angle = 45, hjust = 1))
+turnover_plot <- p_daily / p_month + plot_layout(heights = c(1.45, 1))
+turnover_plot
+```
+
+The first panel shows the daily number of new entries into the KuGou Daily Top100, while the second aggregates the same measure into monthly averages. Together they show that the chart changes continuously but that most days introduce only a relatively small number of songs. The monthly pattern also varies over time, indicating that chart turnover is not constant and should be interpreted as a time-varying feature of the chart rather than as a fixed replacement rate.
+
+### Interactive View: Daily Chart Turnover
+
+The interactive view complements the static turnover figure by allowing exact dates and daily new-entry counts to be inspected with hover, zoom, and pan controls.
+
+```{r daily-interactive, eval=FALSE, include=FALSE, fig.width=11, fig.height=4.5}
+daily_interactive <- plot_ly(
+  daily_flow,
+  x = ~chart_date,
+  y = ~new_entries,
+  type = "scatter",
+  mode = "lines",
+  line = list(color = kugou_blue, width = 2),
+  hovertemplate = paste("Date: %{x|%Y-%m-%d}<br>New entries: %{y}<extra></extra>"),
+  width = 1100,
+  height = 460
+) |>
+  add_lines(
+    x = daily_flow$chart_date,
+    y = predict(loess(new_entries ~ as.numeric(chart_date), data = daily_flow)),
+    line = list(color = kugou_orange, width = 2),
+    name = "Smoothed trend",
+    hoverinfo = "skip"
+  ) |>
+  layout(
+    title = list(text = "Daily New Songs Entering the KuGou Daily Top100", x = 0.02),
+    xaxis = list(title = "Chart date", rangeslider = list(visible = TRUE)),
+    yaxis = list(title = "New entries (songs)"),
+    hovermode = "x unified",
+    plot_bgcolor = "white",
+    paper_bgcolor = "white",
+    font = list(family = "Arial", color = "#263B4D")
+  )
+daily_interactive
+```
+
+## 3.2 Chart-Stay Duration and Longest-Running Songs
+
+```{r persistence}
+persistence_median <- median(track$time_on_chart, na.rm = TRUE)
+persistence_max <- max(track$time_on_chart, na.rm = TRUE)
+persistence_breaks <- c(1, 3, 7, 14, 30, 60, 90, 180, 365, persistence_max)
+persistence_plot <- track |>
+  mutate(persistence_log = log1p(time_on_chart)) |>
+  ggplot(aes(persistence_log, fill = after_stat(count))) +
+  geom_histogram(binwidth = .25, color = "white") +
+  scale_fill_gradient(low = "#D8EEF0", high = "#3F7FA3", guide = "none") +
+  geom_vline(xintercept = log1p(persistence_median), linetype = "dashed", color = "#2F6F7E", linewidth = .7) +
+  annotate("text", x = log1p(persistence_median), y = Inf, label = paste0("Median: ", persistence_median, " days"), vjust = 1.5, hjust = -.05, color = "#2F6F7E", size = 3, family = "sans") +
+  scale_x_continuous(breaks = log1p(persistence_breaks), labels = persistence_breaks) +
+  labs(title = "How Long Songs Remain in the KuGou Daily Top100",
+       x = "Observed days on chart (log1p display; labels show original days)",
+       y = "Number of unique songs") +
+  theme_kugou
+persistence_plot
+```
+
+The persistence histogram shows how many observed days songs remain in the Daily Top100. The log1p display preserves the dense short-stay region while retaining original-day labels, and the dashed line marks the median. The distribution is concentrated toward shorter stays with a smaller long-running tail, so chart visibility is usually brief but a limited set of songs remains present for much longer.
+
+```{r longest}
+longest <- track |>
+  arrange(desc(time_on_chart), peak_rank) |>
+  transmute(
+    `Song title` = track_name,
+    Artist = artist_name,
+    Genre = genre_harmonized,
+    Mood = mood_grouped,
+    `Song duration (min)` = round(duration_min, 2),
+    `Best rank` = peak_rank,
+    `Days on chart` = time_on_chart
+  ) |>
+  slice_head(n = 15)
+kable(
+  longest,
+  caption = "Songs with the longest observed Daily Top100 persistence",
+  format = "html",
+  align = c("l", "l", "l", "l", "r", "r", "r"),
+  table.attr = 'class="kugou-table compact-table"'
+)
+```
+
+The table lists concrete examples from the long-running tail, including artist, genre, mood, best rank, and observed chart days. It makes the aggregate persistence pattern interpretable at the song level and provides examples for later discussion of sustained visibility. It is an illustrative list, not a causal ranking of why songs remain on the chart.
+
+## 3.3 Artist Chart Presence and Ranking Performance
+
+```{r artist-performance, fig.width=11, fig.height=7}
+artist_summary <- track |>
+  mutate(artist = str_squish(artist_name)) |>
+  filter(!is.na(artist), artist != "", !is.na(peak_rank)) |>
+  group_by(artist) |>
+  summarise(
+    song_count = n_distinct(kugou_song_id),
+    median_peak_rank = median(peak_rank, na.rm = TRUE),
+    q1_rank = quantile(peak_rank, .25, na.rm = TRUE, names = FALSE),
+    q3_rank = quantile(peak_rank, .75, na.rm = TRUE, names = FALSE),
+    .groups = "drop"
+  ) |>
+  arrange(desc(song_count), median_peak_rank) |>
+  slice_head(n = 15)
+
+artist_plot <- ggplot(artist_summary, aes(song_count, median_peak_rank)) +
+  geom_errorbar(aes(ymin = q1_rank, ymax = q3_rank,
+                    colour = median_peak_rank), width = .55, linewidth = 1.05) +
+  geom_point(aes(size = song_count, colour = median_peak_rank), alpha = .92) +
+  geom_text_repel(aes(label = artist), family = "Songti SC", size = 3.1,
+                  colour = "#334155", box.padding = .55,
+                  point.padding = .25, min.segment.length = 0,
+                  segment.colour = "#94A3B8", segment.size = .25,
+                  max.overlaps = Inf, seed = 42) +
+  scale_size_continuous(range = c(3.5, 15), name = "Number of charted songs",
+                        breaks = scales::pretty_breaks(n = 4)) +
+  scale_colour_gradient(low = "#FFF1B8", high = "#F2A23A",
+                        limits = c(100, 0), trans = "reverse",
+                        name = "Median best rank\n(lower is better)",
+                        guide = guide_colorbar(order = 2)) +
+  scale_x_continuous(expand = expansion(mult = c(.03, .22))) +
+  scale_y_reverse(breaks = seq(0, 100, 10), limits = c(100, 0),
+                  expand = expansion(mult = c(.05, .06))) +
+  labs(
+    title = "Artist Song Count and Best-Rank Performance on the KuGou Daily Top100",
+    x = "Number of unique songs on the KuGou Daily Top100",
+    y = "Median best chart rank (lower rank is better)"
+  ) +
+  theme_kugou
+artist_plot
+```
+
+This figure links artist exposure and ranking performance in one view. Horizontal position and point size show how many distinct songs an artist contributed; vertical position and colour summarize the median best rank, and the range line shows within-artist variation. The main conclusion is whether artists with broader chart presence also tend to achieve stronger ranks. The relationship is descriptive and should not be read as a causal measure of platform preference.
+
+## 3.4 Music Characteristics
+
+### Genre Composition
+
+```{r genre}
+genre_detail <- track |>
+  transmute(genre = genre_harmonized,
+            detail = replace_na(genre_category, "Unspecified")) |>
+  count(genre, detail, name = "tracks") |>
+  group_by(genre) |>
+  mutate(share = tracks / sum(tracks)) |>
+  ungroup()
+
+genre_order <- genre_detail |>
+  group_by(genre) |>
+  summarise(total = sum(tracks), .groups = "drop") |>
+  arrange(total) |>
+  pull(genre)
+
+top_three <- tail(genre_order, 3)
+detail_order <- genre_detail |>
+  filter(genre %in% top_three) |>
+  mutate(genre = factor(genre, levels = genre_order)) |>
+  arrange(genre, share) |>
+  pull(detail) |>
+  unique()
+
+genre_detail <- genre_detail |>
+  mutate(
+    genre = factor(genre, levels = genre_order),
+    detail_key = if_else(genre %in% top_three, detail, "Other genre groups"),
+    detail_key = factor(detail_key, levels = c(detail_order, "Other genre groups"))
+  )
+
+genre_totals <- genre_detail |>
+  group_by(genre) |>
+  summarise(total_tracks = sum(tracks), .groups = "drop")
+
+blue_detail_cols <- c(
+  setNames(grDevices::colorRampPalette(c(kugou_sky, kugou_navy))(length(detail_order)), detail_order),
+  "Other genre groups" = kugou_sky
+)
+
+# Build a grouped legend: harmonized genres first, then their detailed genres.
+legend_levels <- character()
+legend_labels <- character()
+legend_values <- character()
+for (g in rev(top_three)) {
+  details_g <- genre_detail |>
+    filter(genre == g) |>
+    arrange(share) |>
+    pull(detail) |>
+    unique()
+  heading <- paste0("__", g)
+  legend_levels <- c(legend_levels, heading, details_g)
+  legend_labels <- c(legend_labels, paste0(g, " {"), paste0(g, " └─ ", details_g))
+  legend_values <- c(legend_values, setNames("transparent", heading), blue_detail_cols[details_g])
+}
+legend_levels <- c(legend_levels, "Other genre groups")
+legend_labels <- c(legend_labels, "Other genre groups")
+legend_values <- c(legend_values, `Other genre groups` = blue_detail_cols[["Other genre groups"]])
+
+genre_plot <- ggplot(genre_detail, aes(genre, tracks, fill = detail_key)) +
+  geom_col(width = .7, colour = "white", linewidth = .2) +
+  geom_text(
+    data = genre_detail |> filter(genre %in% top_three, share >= .10),
+    aes(label = paste0(detail, " ", scales::percent(share, accuracy = 1))),
+    position = position_stack(vjust = .5), colour = "white",
+    fontface = "bold", size = 2.7, show.legend = FALSE
+  ) +
+  geom_text(
+    data = genre_totals,
+    aes(x = genre, y = total_tracks, label = paste0(total_tracks, " tracks")),
+    inherit.aes = FALSE, hjust = -.15, colour = kugou_navy,
+    family = "sans", size = 3
+  ) +
+  scale_fill_manual(
+    values = legend_values,
+    breaks = legend_levels,
+    labels = legend_labels,
+    drop = FALSE,
+    name = "Genre hierarchy"
+  ) +
+  coord_flip() +
+  scale_y_continuous(expand = expansion(mult = c(0, .18))) +
+  labs(title = "Music Genre Composition of the KuGou Daily Top100",
+       x = "Music genre", y = "Number of unique tracks") +
+  theme_kugou
+genre_plot
+```
+
+The genre-composition chart shows how the KuGou Daily Top100 is distributed across harmonized genre groups and, within the largest groups, their detailed labels. The bars are concentrated in a small number of categories, indicating a clear genre profile rather than an even distribution across all classified music types. These counts describe chart composition and do not represent the full distribution of all KuGou music.
+
+### Best Chart Rank by Genre
+```{r rank-genre, fig.width=10, fig.height=8}
+genre_long <- track |> select(kugou_song_id, peak_rank, genre_harmonized) |> rename(genre = genre_harmonized)
+genre_long <- genre_long |> add_count(genre, name = "genre_n") |> filter(genre_n >= 5)
+genre_medians <- genre_long |> group_by(genre) |> summarise(median_rank = median(peak_rank, na.rm = TRUE), .groups = "drop")
+# Keep the original classification order when read from top to bottom.
+# coord_flip() displays discrete levels in reverse vertical order, so the
+# factor levels are stored in reverse here.
+genre_display_order <- c("Other", "Dance / Electronic", "Hip Hop / Rap", "R&B / Soul", "Rock", "Pop")
+genre_long <- genre_long |> left_join(genre_medians, by = "genre") |>
+  mutate(genre = factor(genre, levels = genre_display_order))
+rank_genre_plot <- ggplot(genre_long, aes(genre, peak_rank, fill = median_rank)) +
+  geom_violin(trim = FALSE, alpha = .72, color = NA) +
+  geom_boxplot(width = .16, fill = "white", color = kugou_navy, outlier.color = kugou_blue, outlier.alpha = .35) +
+  scale_fill_gradient(low = "#7FC6C3", high = kugou_blue, guide = "none") +
+  coord_flip() + scale_y_reverse(breaks = seq(0, 100, 20), expand = expansion(mult = c(.05, .18))) +
+  labs(title = "Distribution of Best Chart Rank by Music Genre", x = "Music genre", y = "Best chart rank (lower rank is better)") + theme_kugou
+rank_genre_plot
+```
+
+The genre rank figure compares the distribution of each genre's best chart rank. Violin shapes show the full distribution and boxplots highlight the median and central spread, with lower ranks indicating better chart performance. The groups differ in both central rank and within-genre variation, suggesting that genre is relevant to describing ranking patterns, although the figure alone cannot explain the underlying causes.
+
+### Mood Composition
+```{r theme}
+theme_detail <- track |>
+  transmute(theme = mood_grouped,
+            detail = replace_na(mood_category, "Unspecified")) |>
+  count(theme, detail, name = "tracks") |>
+  group_by(theme) |>
+  mutate(share = tracks / sum(tracks)) |>
+  ungroup()
+
+theme_order <- theme_detail |>
+  group_by(theme) |>
+  summarise(total = sum(tracks), .groups = "drop") |>
+  arrange(total) |>
+  pull(theme)
+
+theme_top_five <- tail(theme_order, 5)
+theme_detail_order <- theme_detail |>
+  filter(theme %in% theme_top_five) |>
+  mutate(theme = factor(theme, levels = theme_order)) |>
+  arrange(theme, share) |>
+  pull(detail) |>
+  unique()
+
+theme_detail <- theme_detail |>
+  mutate(
+    theme = factor(theme, levels = theme_order),
+    detail_key = if_else(theme %in% theme_top_five, detail, "Other mood groups"),
+    detail_key = factor(detail_key, levels = c(theme_detail_order, "Other mood groups"))
+  )
+
+theme_totals <- theme_detail |>
+  group_by(theme) |>
+  summarise(total_tracks = sum(tracks), .groups = "drop")
+
+theme_detail_cols <- c(
+  setNames(grDevices::colorRampPalette(c("#FAD7B1", "#D96C4F"))(length(theme_detail_order)), theme_detail_order),
+  "Other mood groups" = "#FAD7B1"
+)
+
+theme_legend_levels <- character()
+theme_legend_labels <- character()
+theme_legend_values <- character()
+for (g in rev(theme_top_five)) {
+  details_g <- theme_detail |>
+    filter(theme == g) |>
+    arrange(share) |>
+    pull(detail) |>
+    unique()
+  heading <- paste0("__", g)
+  theme_legend_levels <- c(theme_legend_levels, heading, details_g)
+  theme_legend_labels <- c(theme_legend_labels, paste0(g, " {"), paste0(g, " └─ ", details_g))
+  theme_legend_values <- c(theme_legend_values, setNames("transparent", heading), theme_detail_cols[details_g])
+}
+theme_legend_levels <- c(theme_legend_levels, "Other mood groups")
+theme_legend_labels <- c(theme_legend_labels, "Other mood groups")
+theme_legend_values <- c(theme_legend_values, `Other mood groups` = theme_detail_cols[["Other mood groups"]])
+
+mood_plot <- ggplot(theme_detail, aes(theme, tracks, fill = detail_key)) +
+  geom_col(width = .7, colour = "white", linewidth = .2) +
+  geom_text(
+    data = theme_detail |>
+      filter(theme %in% theme_top_five, share >= .10,
+             detail != "Inspirational"),
+    aes(label = paste0(detail, " ", scales::percent(share, accuracy = 1))),
+    position = position_stack(vjust = .5), colour = "white",
+    fontface = "bold", size = 2.7, show.legend = FALSE
+  ) +
+  geom_text(
+    data = theme_totals,
+    aes(x = theme, y = total_tracks, label = paste0(total_tracks, " tracks")),
+    inherit.aes = FALSE, hjust = -.15, colour = "#A94F3B",
+    family = "sans", size = 3
+  ) +
+  scale_fill_manual(values = theme_legend_values, breaks = theme_legend_levels,
+                    labels = theme_legend_labels, drop = FALSE,
+                    name = "Mood hierarchy") +
+  coord_flip() +
+  scale_y_continuous(expand = expansion(mult = c(0, .18))) +
+  labs(title = "Mood Composition of KuGou Daily Top100 Songs",
+       x = "Music mood", y = "Number of unique tracks") +
+  theme_kugou
+mood_plot
+```
+
+### Best Chart Rank by Mood
+```{r rank-mood, fig.width=10, fig.height=8}
+mood_long <- track |>
+  select(kugou_song_id, peak_rank, mood_grouped) |>
+  rename(mood = mood_grouped) |>
+  add_count(mood, name = "mood_n") |>
+  filter(mood_n >= 5)
+
+mood_medians <- mood_long |>
+  group_by(mood) |>
+  summarise(median_rank = median(peak_rank, na.rm = TRUE), .groups = "drop")
+
+mood_long <- mood_long |>
+  left_join(mood_medians, by = "mood") |>
+  mutate(mood = factor(mood, levels = c("Energetic / Positive", "Calm / Healing",
+                                        "Romantic / Affectionate", "Sad / Lonely",
+                                        "Nostalgic / Reflective", "Playful / Fun")))
+
+rank_mood_plot <- ggplot(
+  mood_long,
+  aes(mood, peak_rank, fill = median_rank)
+) +
+  geom_violin(trim = FALSE, alpha = .82, color = NA) +
+  geom_boxplot(
+    width = .16, fill = "white",
+    color = "#A94F3B", outlier.color = "#E76F51", outlier.alpha = .35
+  ) +
+  scale_fill_gradient(low = "#FFF0B3", high = "#E76F51", guide = "none") +
+  coord_flip() +
+  scale_y_reverse(breaks = seq(0, 100, 20), expand = expansion(mult = c(.05, .18))) +
+  labs(
+    title = "Distribution of Best Chart Rank by Music Mood",
+    x = "Music mood", y = "Best chart rank (lower rank is better)"
+  ) +
+  theme_kugou
+rank_mood_plot
+```
+
+The mood-composition chart uses the same harmonized broad categories and displays the detailed mood labels inside the largest groups. It shows which mood groups are most represented and how their internal labels are distributed. The companion mood-rank figure compares the best-rank distributions across moods, so composition and ranking performance can be read separately. Genre and mood are rule-assisted harmonized variables rather than native KuGou labels; interpretations should therefore consider `taxonomy_review_required`.
+
+### Song Duration Distribution
+
+```{r duration}
+duration_median <- median(track$duration_min, na.rm = TRUE)
+duration_p95 <- quantile(track$duration_min, .95, na.rm = TRUE)
+duration_plot <- ggplot(track, aes(duration_min, fill = after_stat(count))) + geom_histogram(binwidth = .25, color = "white") + scale_fill_gradient(low = "#D8EEF0", high = "#3F7FA3", guide = "none") + geom_vline(xintercept = duration_median, linetype = "dashed", color = "#2F6F7E", linewidth = .7) + geom_vline(xintercept = duration_p95, linetype = "dotted", color = kugou_navy, linewidth = .7) + annotate("text", x = duration_median, y = Inf, label = paste0("Median: ", round(duration_median, 2), " min"), vjust = 1.5, hjust = -.05, color = "#2F6F7E", size = 3, family = "sans") + annotate("text", x = duration_p95, y = Inf, label = paste0("95th pct: ", round(duration_p95, 2), " min"), vjust = 3, hjust = 1.05, color = kugou_navy, size = 3, family = "sans") + coord_cartesian(xlim = c(0, quantile(track$duration_min, .99, na.rm = TRUE))) + labs(title = "Distribution of Song Durations in the KuGou Daily Top100", x = "Song duration (minutes)", y = "Number of unique tracks") + theme_kugou
+duration_plot
+```
+
+# 4. Findings and Limitations
+
+```{r findings, results='asis'}
+cat(sprintf("- The data cover %s to %s: %d days, %d daily chart records, and %d unique tracks.\n", min(daily$chart_date), max(daily$chart_date), n_distinct(daily$chart_date), nrow(daily), n_distinct(track$kugou_song_id)))
+cat(sprintf("- The median peak rank is %.0f; median observed chart persistence is %.0f days; the maximum is %.0f days.\n", median(track$peak_rank, na.rm = TRUE), median(track$time_on_chart, na.rm = TRUE), max(track$time_on_chart, na.rm = TRUE)))
+cat("- Because a complete Daily Top100 is available each day, the daily mean rank has limited variation; new entries, Top10 frequency, peak rank, and persistence are more informative.\n")
+cat("- Genre and mood assignments are rule-assisted screening variables with classification risk; this report describes distributions and associations, not causal effects.\n")
+```
