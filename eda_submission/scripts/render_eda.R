@@ -3,7 +3,7 @@
 options(width = 120)
 root <- normalizePath(".", winslash = "/")
 if (!file.exists(file.path(root, "analysis", "douyin_eda.Rmd"))) {
-  stop("Run this script from submission_packages/eda_submission")
+  stop("Run this script from eda_submission")
 }
 
 required <- c("rmarkdown", "knitr", "tidyverse", "lubridate", "jsonlite",

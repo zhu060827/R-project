@@ -4,7 +4,7 @@
 
 ## 正式版本说明
 
-`submission_packages/shiny_submission/` 是本项目唯一正式的 Shiny 源码、测试和部署目录。
+`shiny_submission/` 是本项目唯一正式的 Shiny 源码、测试和部署目录。
 
 项目中其他位置的 `shiny/` 和 `dabao/shiny/` 仅保留作历史开发参考，不应继续单独修改、测试或部署。所有后续修改都应在本目录完成，并从本目录启动应用或部署到 shinyapps.io。
 
@@ -44,7 +44,7 @@ data/processed/
 
 ```r
 rsconnect::deployApp(
-  appDir = "submission_packages/shiny_submission",
+  appDir = "shiny_submission",
   appName = "musicpulse",
   account = "zhu060827",
   launch.browser = FALSE

@@ -1,7 +1,12 @@
 # Large submission data are stored through Git LFS.
-submission_packages/**/*.csv filter=lfs diff=lfs merge=lfs -text
-submission_packages/**/*.rds filter=lfs diff=lfs merge=lfs -text
-submission_packages/**/*.mp3 filter=lfs diff=lfs merge=lfs -text
-submission_packages/data_processing/raw_acquisition_data.tar.gz filter=lfs diff=lfs merge=lfs -text
-submission_packages/data_processing/**/data/raw/**/*.json filter=lfs diff=lfs merge=lfs -text
-submission_packages/data_processing/**/data/raw/**/*.csv filter=lfs diff=lfs merge=lfs -text
+data_processing/**/*.csv filter=lfs diff=lfs merge=lfs -text
+data_processing/**/*.rds filter=lfs diff=lfs merge=lfs -text
+data_processing/**/*.mp3 filter=lfs diff=lfs merge=lfs -text
+data_processing/raw_acquisition_data.tar.gz filter=lfs diff=lfs merge=lfs -text
+data_processing/**/data/raw/**/*.json filter=lfs diff=lfs merge=lfs -text
+data_processing/**/data/raw/**/*.csv filter=lfs diff=lfs merge=lfs -text
+data_submission/**/*.csv filter=lfs diff=lfs merge=lfs -text
+data_submission/**/*.rds filter=lfs diff=lfs merge=lfs -text
+shiny_submission/**/*.csv filter=lfs diff=lfs merge=lfs -text
+shiny_submission/**/*.rds filter=lfs diff=lfs merge=lfs -text
+shiny_submission/**/*.mp3 filter=lfs diff=lfs merge=lfs -text
