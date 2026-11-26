@@ -22,4 +22,6 @@
 - `eda_submission/`：四个 EDA 报告的源文件和渲染结果。
 - `shiny_submission/`：唯一正式的 Shiny 源码、资源和部署配置。
 
-处理后的大型 CSV、RDS 和 Shiny 音频使用 Git LFS 管理。原始采集导出文件保留在本地最终提交包，不放入 GitHub 源码镜像；`.DS_Store`、备份目录和重复的根目录代码不纳入仓库。
+处理后的大型 CSV、RDS、Shiny 音频和原始采集导出文件使用 Git LFS 管理；`.DS_Store`、备份目录和重复的根目录代码不纳入仓库。
+
+原始采集数据以 `submission_packages/data_processing/raw_acquisition_data.tar.gz` 归档上传。解压到 `submission_packages/data_processing/` 后，可恢复 `01_data_acquisition/data/raw/` 和 `06_us_data_cleaning/data/raw/` 两个原始目录。

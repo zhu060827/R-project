@@ -1,5 +1,2 @@
-# Source-only GitHub mirror: raw acquisition exports remain in the local final package.
-submission_packages/data_processing/01_data_acquisition/data/raw/
-submission_packages/data_processing/06_us_data_cleaning/data/raw/
 .DS_Store
 submission_packages/**/_backup_before_full_app/
